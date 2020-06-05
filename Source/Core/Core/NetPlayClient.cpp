@@ -440,6 +440,19 @@ unsigned int NetPlayClient::OnData(sf::Packet& packet)
   }
   break;
 
+  case NP_MSG_GBA_MAPPING:
+  {
+    for (bool& mapping : m_gba_map)
+    {
+      packet >> mapping;
+    }
+
+    UpdateDevices();
+
+    m_dialog->Update();
+  }
+  break;
+
   case NP_MSG_WIIMOTE_MAPPING:
   {
     for (PlayerId& mapping : m_wiimote_map)
@@ -1677,10 +1690,12 @@ void NetPlayClient::UpdateDevices()
 
   for (auto player_id : m_pad_map)
   {
+    if (m_gba_map[pad])
+    {
+      SerialInterface::ChangeDevice(SerialInterface::SIDEVICE_GC_GBA, pad);
+    }
     // Use local controller types for local controllers if they are compatible
-    // Only GCController-like controllers are supported, GBA and similar
-    // exotic devices are not supported on netplay.
-    if (player_id == m_local_player->pid)
+    else if (player_id == m_local_player->pid)
     {
       if (SerialInterface::SIDevice_IsGCController(SConfig::GetInstance().m_SIDevice[local_pad]))
       {

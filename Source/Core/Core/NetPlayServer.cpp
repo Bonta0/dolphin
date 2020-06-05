@@ -112,6 +112,7 @@ NetPlayServer::NetPlayServer(const u16 port, const bool forward_port, NetPlayUI*
   }
 
   m_pad_map.fill(0);
+  m_gba_map.fill(false);
   m_wiimote_map.fill(0);
 
   if (traversal_config.use_traversal)
@@ -532,6 +533,11 @@ PadMappingArray NetPlayServer::GetPadMapping() const
   return m_pad_map;
 }
 
+GBAMappingArray NetPlayServer::GetGBAMapping() const
+{
+  return m_gba_map;
+}
+
 PadMappingArray NetPlayServer::GetWiimoteMapping() const
 {
   return m_wiimote_map;
@@ -542,6 +548,13 @@ void NetPlayServer::SetPadMapping(const PadMappingArray& mappings)
 {
   m_pad_map = mappings;
   UpdatePadMapping();
+}
+
+// called from ---GUI--- thread
+void NetPlayServer::SetGBAMapping(const GBAMappingArray& mappings)
+{
+  m_gba_map = mappings;
+  UpdateGBAMapping();
 }
 
 // called from ---GUI--- thread
@@ -557,6 +570,18 @@ void NetPlayServer::UpdatePadMapping()
   sf::Packet spac;
   spac << (MessageId)NP_MSG_PAD_MAPPING;
   for (PlayerId mapping : m_pad_map)
+  {
+    spac << mapping;
+  }
+  SendToClients(spac);
+}
+
+// called from ---GUI--- thread and ---NETPLAY--- thread
+void NetPlayServer::UpdateGBAMapping()
+{
+  sf::Packet spac;
+  spac << (MessageId)NP_MSG_GBA_MAPPING;
+  for (PlayerId mapping : m_gba_map)
   {
     spac << mapping;
   }

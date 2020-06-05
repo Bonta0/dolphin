@@ -6,6 +6,7 @@
 
 #include <cstddef>
 #include <cstring>
+#include <map>
 #include <memory>
 #include <mutex>
 #include <queue>
@@ -20,19 +21,15 @@
 #include "Common/Thread.h"
 #include "Core/CoreTiming.h"
 #include "Core/HW/SI/SI_Device.h"
+#include "Core/HW/SI/SI_DeviceGCController.h"
 #include "Core/HW/SystemTimers.h"
+#include "Core/NetPlayClient.h"
 
 namespace SerialInterface
 {
 namespace
 {
-std::thread s_connection_thread;
-std::queue<std::unique_ptr<sf::TcpSocket>> s_waiting_socks;
-std::queue<std::unique_ptr<sf::TcpSocket>> s_waiting_clocks;
-std::mutex s_cs_gba;
-std::mutex s_cs_gba_clk;
-int s_num_connected;
-Common::Flag s_server_running;
+sf::TcpListener s_server;
 }  // namespace
 
 enum EJoybusCmds
@@ -49,7 +46,13 @@ constexpr auto SEND_MAX_SIZE = 5, RECV_MAX_SIZE = 5;
 
 // --- GameBoy Advance "Link Cable" ---
 
-static int GetTransferTime(u8 cmd)
+static int GetSendTransferTime(u8 cmd)
+{
+  u64 bytes_transferred = cmd == CMD_WRITE ? 5 : 1;
+  return static_cast<int>(bytes_transferred * SystemTimers::GetTicksPerSecond() / BYTES_PER_SECOND);
+}
+
+static int GetReceiveTransferTime(u8 cmd)
 {
   u64 bytes_transferred = 0;
 
@@ -58,12 +61,12 @@ static int GetTransferTime(u8 cmd)
   case CMD_RESET:
   case CMD_STATUS:
   {
-    bytes_transferred = 4;
+    bytes_transferred = 3;
     break;
   }
   case CMD_READ:
   {
-    bytes_transferred = 6;
+    bytes_transferred = 5;
     break;
   }
   case CMD_WRITE:
@@ -77,216 +80,100 @@ static int GetTransferTime(u8 cmd)
     break;
   }
   }
-  return static_cast<int>(bytes_transferred * SystemTimers::GetTicksPerSecond() /
-                          (std::max(s_num_connected, 1) * BYTES_PER_SECOND));
+  return static_cast<int>(bytes_transferred * SystemTimers::GetTicksPerSecond() / BYTES_PER_SECOND);
 }
 
-static void GBAConnectionWaiter()
+static void GBAStartListening()
 {
-  s_server_running.Set();
-
-  Common::SetCurrentThreadName("GBA Connection Waiter");
-
-  sf::TcpListener server;
-  sf::TcpListener clock_server;
+  if (s_server.getLocalPort() != 0)
+    return;
 
   // "dolphin gba"
-  if (server.listen(0xd6ba) != sf::Socket::Done)
+  if (s_server.listen(0xd6ba) != sf::Socket::Done)
     return;
 
-  // "clock"
-  if (clock_server.listen(0xc10c) != sf::Socket::Done)
-    return;
-
-  server.setBlocking(false);
-  clock_server.setBlocking(false);
-
-  auto new_client = std::make_unique<sf::TcpSocket>();
-  while (s_server_running.IsSet())
-  {
-    if (server.accept(*new_client) == sf::Socket::Done)
-    {
-      std::lock_guard<std::mutex> lk(s_cs_gba);
-      s_waiting_socks.push(std::move(new_client));
-
-      new_client = std::make_unique<sf::TcpSocket>();
-    }
-    if (clock_server.accept(*new_client) == sf::Socket::Done)
-    {
-      std::lock_guard<std::mutex> lk(s_cs_gba_clk);
-      s_waiting_clocks.push(std::move(new_client));
-
-      new_client = std::make_unique<sf::TcpSocket>();
-    }
-
-    Common::SleepCurrentThread(1);
-  }
+  s_server.setBlocking(false);
 }
 
 void GBAConnectionWaiter_Shutdown()
 {
-  s_server_running.Clear();
-  if (s_connection_thread.joinable())
-    s_connection_thread.join();
+  s_server.close();
 }
 
-template <typename T>
-static std::unique_ptr<T> MoveFromFront(std::queue<std::unique_ptr<T>>& ptrs)
+bool GBASockServer::Send(const u8* si_buffer, s32 ticks, s32 waiting, u16 pad)
 {
-  if (ptrs.empty())
-    return nullptr;
-  std::unique_ptr<T> ptr = std::move(ptrs.front());
-  ptrs.pop();
-  return ptr;
-}
+  GBAStartListening();
 
-static std::unique_ptr<sf::TcpSocket> GetNextSock()
-{
-  std::lock_guard<std::mutex> lk(s_cs_gba);
-  return MoveFromFront(s_waiting_socks);
-}
-
-static std::unique_ptr<sf::TcpSocket> GetNextClock()
-{
-  std::lock_guard<std::mutex> lk(s_cs_gba_clk);
-  return MoveFromFront(s_waiting_clocks);
-}
-
-GBASockServer::GBASockServer()
-{
-  if (!s_connection_thread.joinable())
-    s_connection_thread = std::thread(GBAConnectionWaiter);
-
-  s_num_connected = 0;
-}
-
-GBASockServer::~GBASockServer()
-{
-  Disconnect();
-}
-
-void GBASockServer::Disconnect()
-{
-  if (m_client)
+  if (!m_connected)
   {
-    s_num_connected--;
-    m_client->disconnect();
-    m_client = nullptr;
-  }
-  if (m_clock_sync)
-  {
-    m_clock_sync->disconnect();
-    m_clock_sync = nullptr;
-  }
-  m_last_time_slice = 0;
-  m_booted = false;
-}
+    if (!m_disconnected)
+    {
+      sf::SocketSelector selector;
+      selector.add(s_server);
+      selector.wait();
+    }
 
-void GBASockServer::ClockSync()
-{
-  if (!m_clock_sync)
-    if (!(m_clock_sync = GetNextClock()))
-      return;
+    if (s_server.accept(m_client) != sf::Socket::Done)
+      return false;
 
-  u32 time_slice = 0;
-
-  if (m_last_time_slice == 0)
-  {
-    s_num_connected++;
-    m_last_time_slice = CoreTiming::GetTicks();
-    time_slice = (u32)(SystemTimers::GetTicksPerSecond() / 60);
-  }
-  else
-  {
-    time_slice = (u32)(CoreTiming::GetTicks() - m_last_time_slice);
+    m_client.setBlocking(false);
+    m_connected = true;
   }
 
-  time_slice = (u32)((u64)time_slice * 16777216 / SystemTimers::GetTicksPerSecond());
-  m_last_time_slice = CoreTiming::GetTicks();
-  char bytes[4] = {0, 0, 0, 0};
-  bytes[0] = (time_slice >> 24) & 0xff;
-  bytes[1] = (time_slice >> 16) & 0xff;
-  bytes[2] = (time_slice >> 8) & 0xff;
-  bytes[3] = time_slice & 0xff;
+  std::array<u8, SEND_MAX_SIZE> data;
+  std::memcpy(data.data(), si_buffer, si_buffer[0] == CMD_WRITE ? SEND_MAX_SIZE : 1);
 
-  sf::Socket::Status status = m_clock_sync->send(bytes, 4);
-  if (status == sf::Socket::Disconnected)
+  sf::Packet packet;
+  packet << data[0] << data[1] << data[2] << data[3] << data[4] << ticks << waiting << pad;
+
+  if (m_client.send(packet) != sf::Socket::Done)
   {
-    m_clock_sync->disconnect();
-    m_clock_sync = nullptr;
+    m_client.disconnect();
+    m_connected = false;
+    m_disconnected = true;
   }
-}
 
-bool GBASockServer::Connect()
-{
-  if (!IsConnected())
-    m_client = GetNextSock();
-  return IsConnected();
-}
-
-bool GBASockServer::IsConnected()
-{
-  return static_cast<bool>(m_client);
-}
-
-void GBASockServer::Send(const u8* si_buffer)
-{
-  if (!Connect())
-    return;
-
-  std::array<u8, SEND_MAX_SIZE> send_data;
-  for (size_t i = 0; i < send_data.size(); i++)
-    send_data[i] = si_buffer[i];
-
-  u8 cmd = send_data[0];
-  if (cmd != CMD_STATUS)
-    m_booted = true;
-
-  m_client->setBlocking(false);
-  sf::Socket::Status status;
-  if (cmd == CMD_WRITE)
-    status = m_client->send(send_data.data(), send_data.size());
-  else
-    status = m_client->send(send_data.data(), 1);
-
-  if (status == sf::Socket::Disconnected)
-    Disconnect();
+  return m_connected;
 }
 
 int GBASockServer::Receive(u8* si_buffer)
 {
-  if (!m_client)
-    return 0;
-
-  if (m_booted)
-  {
-    sf::SocketSelector selector;
-    selector.add(*m_client);
-    selector.wait(sf::milliseconds(1000));
-  }
+  sf::SocketSelector selector;
+  selector.add(m_client);
+  selector.wait();
 
   size_t num_received = 0;
-  std::array<u8, RECV_MAX_SIZE> recv_data;
+  std::array<u8, RECV_MAX_SIZE + 1> recv_data;
   sf::Socket::Status recv_stat =
-      m_client->receive(recv_data.data(), recv_data.size(), num_received);
-  if (recv_stat == sf::Socket::Disconnected)
+      m_client.receive(recv_data.data(), recv_data.size(), num_received);
+
+  if (recv_stat != sf::Socket::Done)
   {
-    Disconnect();
+    m_client.disconnect();
+    m_connected = false;
+    m_disconnected = true;
     return 0;
   }
 
-  if (recv_stat == sf::Socket::NotReady || num_received == 0)
+  if (!recv_data[0])
   {
-    m_booted = false;
     return 0;
   }
 
-  for (size_t i = 0; i < recv_data.size(); i++)
-    si_buffer[i] = recv_data[i];
-  return static_cast<int>(std::min(num_received, recv_data.size()));
+  std::memcpy(si_buffer, &recv_data[1], num_received - 1);
+  return static_cast<int>(num_received);
+}
+
+bool GBASockServer::IsConnected() const
+{
+  return m_connected;
 }
 
 CSIDevice_GBA::CSIDevice_GBA(SIDevices device, int device_number) : ISIDevice(device, device_number)
+{
+}
+
+CSIDevice_GBA::~CSIDevice_GBA()
 {
 }
 
@@ -296,32 +183,39 @@ int CSIDevice_GBA::RunBuffer(u8* buffer, int request_length)
   {
   case NextAction::SendCommand:
   {
-    m_sock_server.ClockSync();
-    if (m_sock_server.Connect())
-    {
-#ifdef _DEBUG
-      NOTICE_LOG(SERIALINTERFACE, "%01d cmd %02x [> %02x%02x%02x%02x]", m_device_number, buffer[0],
-                 buffer[1], buffer[2], buffer[3], buffer[4]);
-#endif
-      m_sock_server.Send(buffer);
-    }
-    else
+    const u64 send_time = CoreTiming::GetTicks() + GetSendTransferTime(buffer[0]);
+
+    if (!m_sock_server.IsConnected())
+      m_timestamp_sent = CoreTiming::GetTicks();
+
+    const s32 gba_ticks = static_cast<s32>((send_time - m_timestamp_sent) * 16777216 /
+                                           SystemTimers::GetTicksPerSecond());
+
+    const s32 gba_wait = static_cast<s32>(static_cast<u64>(GetReceiveTransferTime(buffer[0])) * 16777216 /
+                                          SystemTimers::GetTicksPerSecond());
+
+    m_timestamp_sent = send_time;
+    m_last_cmd = buffer[0];
+
+    if (!m_sock_server.Send(buffer, gba_ticks, gba_wait, GetGBAPad()))
     {
       u32 reply = Common::swap32(SI_ERROR_NO_RESPONSE);
       std::memcpy(buffer, &reply, sizeof(reply));
       return sizeof(reply);
     }
-    m_last_cmd = buffer[0];
-    m_timestamp_sent = CoreTiming::GetTicks();
+
+#ifdef _DEBUG
+    NOTICE_LOG(SERIALINTERFACE, "%01d cmd %02x [> %02x%02x%02x%02x]", m_device_number, buffer[0],
+               buffer[1], buffer[2], buffer[3], buffer[4]);
+#endif
     m_next_action = NextAction::WaitTransferTime;
     [[fallthrough]];
   }
 
   case NextAction::WaitTransferTime:
   {
-    int elapsed_time = static_cast<int>(CoreTiming::GetTicks() - m_timestamp_sent);
     // Tell SI to ask again after TransferInterval() cycles
-    if (GetTransferTime(m_last_cmd) > elapsed_time)
+    if (CoreTiming::GetTicks() < (m_timestamp_sent + GetReceiveTransferTime(m_last_cmd)))
       return 0;
     m_next_action = NextAction::ReceiveResponse;
     [[fallthrough]];
@@ -356,7 +250,7 @@ int CSIDevice_GBA::RunBuffer(u8* buffer, int request_length)
 
 int CSIDevice_GBA::TransferInterval()
 {
-  return GetTransferTime(m_last_cmd);
+  return m_timestamp_sent - CoreTiming::GetTicks() + GetReceiveTransferTime(m_last_cmd);
 }
 
 bool CSIDevice_GBA::GetData(u32& hi, u32& low)
@@ -366,5 +260,36 @@ bool CSIDevice_GBA::GetData(u32& hi, u32& low)
 
 void CSIDevice_GBA::SendCommand(u32 command, u8 poll)
 {
+}
+
+u16 CSIDevice_GBA::GetGBAPad()
+{
+  GCPadStatus pad_status = {};
+  if (!NetPlay::IsNetPlayRunning())
+    pad_status = Pad::GetStatus(m_device_number);
+  else
+    SerialInterface::CSIDevice_GCController::NetPlay_GetInput(m_device_number, &pad_status);
+
+  std::map<PadButton, u16> buttons_map = {
+      {PadButton::PAD_BUTTON_A, 0x0001},      // A
+      {PadButton::PAD_BUTTON_B, 0x0002},      // B
+      {PadButton::PAD_TRIGGER_Z, 0x0004},     // Select
+      {PadButton::PAD_BUTTON_START, 0x0008},  // Start
+      {PadButton::PAD_BUTTON_RIGHT, 0x0010},  // Right
+      {PadButton::PAD_BUTTON_LEFT, 0x0020},   // Left
+      {PadButton::PAD_BUTTON_UP, 0x0040},     // Up
+      {PadButton::PAD_BUTTON_DOWN, 0x0080},   // Down
+      {PadButton::PAD_TRIGGER_R, 0x0100},     // R
+      {PadButton::PAD_TRIGGER_L, 0x0200},     // L
+  };
+
+  u16 pad = 0;
+  for (const auto& pair : buttons_map)
+  {
+    if (pad_status.button & pair.first)
+      pad |= pair.second;
+  }
+
+  return pad;
 }
 }  // namespace SerialInterface

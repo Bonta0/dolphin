@@ -204,6 +204,7 @@ protected:
   u32 m_current_game = 0;
 
   PadMappingArray m_pad_map;
+  GBAMappingArray m_gba_map;
   PadMappingArray m_wiimote_map;
 
   bool m_is_recording = false;

@@ -128,6 +128,8 @@ enum
   NP_MSG_PAD_BUFFER = 0x62,
   NP_MSG_PAD_HOST_DATA = 0x63,
 
+  NP_MSG_GBA_MAPPING = 0x64,
+
   NP_MSG_WIIMOTE_DATA = 0x70,
   NP_MSG_WIIMOTE_MAPPING = 0x71,
 
@@ -208,6 +210,7 @@ using PlayerId = u8;
 using FrameNum = u32;
 using PadIndex = s8;
 using PadMappingArray = std::array<PlayerId, 4>;
+using GBAMappingArray = std::array<bool, 4>;
 
 bool IsNetPlayRunning();
 // Precondition: A netplay client instance must be present. In other words,

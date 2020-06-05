@@ -278,6 +278,7 @@ void NetPlayDialog::ConnectWidgets()
     m_pad_mapping->exec();
 
     Settings::Instance().GetNetPlayServer()->SetPadMapping(m_pad_mapping->GetGCPadArray());
+    Settings::Instance().GetNetPlayServer()->SetGBAMapping(m_pad_mapping->GetGBAArray());
     Settings::Instance().GetNetPlayServer()->SetWiimoteMapping(m_pad_mapping->GetWiimoteArray());
   });
 
