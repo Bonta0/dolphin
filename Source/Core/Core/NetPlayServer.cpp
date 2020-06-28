@@ -42,6 +42,7 @@
 #include "Core/HW/GCMemcard/GCMemcardDirectory.h"
 #include "Core/HW/GCMemcard/GCMemcardRaw.h"
 #include "Core/HW/Sram.h"
+#include "Core/HW/SI/SI_DeviceGBA.h"
 #include "Core/HW/WiiSave.h"
 #include "Core/HW/WiiSaveStructs.h"
 #include "Core/HW/WiimoteEmu/WiimoteEmu.h"
@@ -71,8 +72,13 @@
 
 namespace NetPlay
 {
+
+// ugh
+NetPlayServer* netplay_server = nullptr;
+
 NetPlayServer::~NetPlayServer()
 {
+  netplay_server = nullptr;
   if (is_connected)
   {
     m_do_loop = false;
@@ -105,6 +111,7 @@ NetPlayServer::NetPlayServer(const u16 port, const bool forward_port, NetPlayUI*
                              const NetTraversalConfig& traversal_config)
     : m_dialog(dialog)
 {
+  netplay_server = this;
   //--use server time
   if (enet_initialize() != 0)
   {
@@ -112,7 +119,7 @@ NetPlayServer::NetPlayServer(const u16 port, const bool forward_port, NetPlayUI*
   }
 
   m_pad_map.fill(0);
-  m_gba_map.fill(false);
+  m_gba_enabled.fill(false);
   m_wiimote_map.fill(0);
 
   if (traversal_config.use_traversal)
@@ -533,9 +540,9 @@ PadMappingArray NetPlayServer::GetPadMapping() const
   return m_pad_map;
 }
 
-GBAMappingArray NetPlayServer::GetGBAMapping() const
+GBAEnabledArray NetPlayServer::GetGBAEnabled() const
 {
-  return m_gba_map;
+  return m_gba_enabled;
 }
 
 PadMappingArray NetPlayServer::GetWiimoteMapping() const
@@ -551,10 +558,10 @@ void NetPlayServer::SetPadMapping(const PadMappingArray& mappings)
 }
 
 // called from ---GUI--- thread
-void NetPlayServer::SetGBAMapping(const GBAMappingArray& mappings)
+void NetPlayServer::SetGBAEnabled(const GBAEnabledArray& mappings)
 {
-  m_gba_map = mappings;
-  UpdateGBAMapping();
+  m_gba_enabled = mappings;
+  UpdateGBAEnabled();
 }
 
 // called from ---GUI--- thread
@@ -577,11 +584,11 @@ void NetPlayServer::UpdatePadMapping()
 }
 
 // called from ---GUI--- thread and ---NETPLAY--- thread
-void NetPlayServer::UpdateGBAMapping()
+void NetPlayServer::UpdateGBAEnabled()
 {
   sf::Packet spac;
-  spac << (MessageId)NP_MSG_GBA_MAPPING;
-  for (PlayerId mapping : m_gba_map)
+  spac << (MessageId)NP_MSG_GBA_ENABLED;
+  for (PlayerId mapping : m_gba_enabled)
   {
     spac << mapping;
   }
@@ -2159,3 +2166,21 @@ void NetPlayServer::ChunkedDataAbort()
   m_chunked_data_complete_event.Set();
 }
 }  // namespace NetPlay
+
+bool SerialInterface::CSIDevice_GBA::NetPlay_SendData(int pad_num, NetPlay::GBAStatus* status)
+{
+  if (!NetPlay::netplay_server)
+    return false;
+
+  sf::Packet packet;
+  packet << static_cast<NetPlay::MessageId>(NetPlay::NP_MSG_GBA_DATA);
+  packet << static_cast<NetPlay::PadIndex>(pad_num);
+
+  u8 size = static_cast<u8>(status->resp.size());
+  packet << status->sent << status->ticks << size;
+  for (unsigned int i = 0; i < size; ++i)
+    packet << status->resp[i];
+
+  NetPlay::netplay_server->SendAsyncToClients(std::move(packet), 1);
+  return true;
+}

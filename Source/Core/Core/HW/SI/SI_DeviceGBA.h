@@ -6,11 +6,13 @@
 
 #include <array>
 #include <memory>
+#include <vector>
 
 #include <SFML/Network.hpp>
 
 #include "Common/CommonTypes.h"
 #include "Core/HW/SI/SI_Device.h"
+#include "Core/NetPlayProto.h"
 
 // GameBoy Advance "Link Cable"
 
@@ -21,19 +23,29 @@ void GBAConnectionWaiter_Shutdown();
 class GBASockServer
 {
 public:
-  GBASockServer() = default;
+  GBASockServer(int device_number) : m_device_number(device_number) {}
   ~GBASockServer() = default;
 
-  bool Send(const u8* si_buffer, s32 ticks, s32 waiting, u16 pad);
-  int Receive(u8* si_buffer);
+  bool Send(const u8* si_buffer, u64 ticks, u16 pad, bool movie = false);
+  bool Receive(NetPlay::GBAStatus* status);
+  void SendMovieUpdate(const u8* si_buffer, u64 ticks, u16 pad);
 
+  void Disconnect();
   bool IsConnected() const;
 
 private:
   sf::TcpSocket m_client;
 
-  bool m_connected = false;
+  int m_device_number = 0;
   bool m_disconnected = false;
+
+  struct MovieUpdate
+  {
+    std::vector<u8> data;
+    u64 ticks;
+    u16 pad;
+  };
+  std::vector<MovieUpdate> m_movie_queue;
 };
 
 class CSIDevice_GBA : public ISIDevice
@@ -46,6 +58,10 @@ public:
   int TransferInterval() override;
   bool GetData(u32& hi, u32& low) override;
   void SendCommand(u32 command, u8 poll) override;
+
+  bool NetPlay_GetData(NetPlay::GBAStatus* status);
+  bool NetPlay_SendData(int pad_num, NetPlay::GBAStatus* status);
+  bool NetPlay_IsClient();
 
 private:
   enum class NextAction
@@ -61,5 +77,9 @@ private:
   NextAction m_next_action = NextAction::SendCommand;
   u64 m_timestamp_sent = 0;
   u8 m_last_cmd = 0;
+  NetPlay::GBAStatus m_last_status{};
+
+  u16 m_last_padstatus = 0;
+  u64 m_next_pad_update = 0;
 };
 }  // namespace SerialInterface

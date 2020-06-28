@@ -41,6 +41,7 @@
 #include "Core/HW/EXI/EXI_DeviceIPL.h"
 #include "Core/HW/SI/SI.h"
 #include "Core/HW/SI/SI_Device.h"
+#include "Core/HW/SI/SI_DeviceGBA.h"
 #include "Core/HW/SI/SI_DeviceGCController.h"
 #include "Core/HW/Sram.h"
 #include "Core/HW/WiiSave.h"
@@ -440,19 +441,6 @@ unsigned int NetPlayClient::OnData(sf::Packet& packet)
   }
   break;
 
-  case NP_MSG_GBA_MAPPING:
-  {
-    for (bool& mapping : m_gba_map)
-    {
-      packet >> mapping;
-    }
-
-    UpdateDevices();
-
-    m_dialog->Update();
-  }
-  break;
-
   case NP_MSG_WIIMOTE_MAPPING:
   {
     for (PlayerId& mapping : m_wiimote_map)
@@ -503,6 +491,42 @@ unsigned int NetPlayClient::OnData(sf::Packet& packet)
         m_first_pad_status_received[map] = true;
         m_first_pad_status_received_event.Set();
       }
+    }
+  }
+  break;
+
+  case NP_MSG_GBA_ENABLED:
+  {
+    for (bool& mapping : m_gba_enabled)
+    {
+      packet >> mapping;
+    }
+
+    UpdateDevices();
+
+    m_dialog->Update();
+  }
+  break;
+
+  case NP_MSG_GBA_DATA:
+  {
+    while (!packet.endOfPacket())
+    {
+      PadIndex map;
+      packet >> map;
+
+      GBAStatus gba;
+      u8 size;
+      packet >> gba.sent >> gba.ticks >> size;
+
+      gba.resp.resize(size);
+      for (unsigned int i = 0; i < size; ++i)
+        packet >> gba.resp[i];
+
+      // Trusting server for good map value (>=0 && <4)
+      // add to pad buffer
+      m_gba_buffer.at(map).Push(gba);
+      m_gba_data_event.Set();
     }
   }
   break;
@@ -1690,7 +1714,7 @@ void NetPlayClient::UpdateDevices()
 
   for (auto player_id : m_pad_map)
   {
-    if (m_gba_map[pad])
+    if (m_gba_enabled[pad])
     {
       SerialInterface::ChangeDevice(SerialInterface::SIDEVICE_GC_GBA, pad);
     }
@@ -1732,6 +1756,9 @@ void NetPlayClient::ClearBuffers()
   {
     while (m_pad_buffer[i].Size())
       m_pad_buffer[i].Pop();
+
+    while (m_gba_buffer[i].Size())
+      m_gba_buffer[i].Pop();
 
     while (m_wiimote_buffer[i].Size())
       m_wiimote_buffer[i].Pop();
@@ -1926,6 +1953,28 @@ bool NetPlayClient::GetNetPads(const int pad_nb, const bool batching, GCPadStatu
   }
 
   return true;
+}
+
+bool NetPlayClient::GetGbaData(int pad_nb, GBAStatus* status)
+{
+  while (m_gba_buffer[pad_nb].Size() == 0)
+  {
+    if (!m_is_running.IsSet())
+    {
+      return false;
+    }
+
+    m_gba_data_event.Wait();
+  }
+
+  m_gba_buffer[pad_nb].Pop(*status);
+
+  return true;
+}
+
+bool NetPlayClient::IsGbaClient()
+{
+  return m_host_input_authority && m_local_player && !m_local_player->IsHost();
 }
 
 u64 NetPlayClient::GetInitialRTCValue() const
@@ -2132,6 +2181,7 @@ bool NetPlayClient::StopGame()
 
   // stop waiting for input
   m_gc_pad_event.Set();
+  m_gba_data_event.Set();
   m_wii_pad_event.Set();
   m_first_pad_status_received_event.Set();
   m_wait_on_input_event.Set();
@@ -2156,6 +2206,7 @@ void NetPlayClient::Stop()
 
   // stop waiting for input
   m_gc_pad_event.Set();
+  m_gba_data_event.Set();
   m_wii_pad_event.Set();
   m_first_pad_status_received_event.Set();
   m_wait_on_input_event.Set();
@@ -2459,6 +2510,26 @@ bool SerialInterface::CSIDevice_GCController::NetPlay_GetInput(int pad_num, GCPa
 
   if (NetPlay::netplay_client)
     return NetPlay::netplay_client->GetNetPads(pad_num, NetPlay::s_si_poll_batching, status);
+
+  return false;
+}
+
+bool SerialInterface::CSIDevice_GBA::NetPlay_GetData(NetPlay::GBAStatus* status)
+{
+  std::lock_guard<std::mutex> lk(NetPlay::crit_netplay_client);
+
+  if (NetPlay::netplay_client)
+    return NetPlay::netplay_client->GetGbaData(m_device_number, status);
+
+  return false;
+}
+
+bool SerialInterface::CSIDevice_GBA::NetPlay_IsClient()
+{
+  std::lock_guard<std::mutex> lk(NetPlay::crit_netplay_client);
+
+  if (NetPlay::netplay_client)
+    return NetPlay::netplay_client->IsGbaClient();
 
   return false;
 }

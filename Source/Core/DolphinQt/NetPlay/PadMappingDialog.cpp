@@ -73,7 +73,7 @@ int PadMappingDialog::exec()
   // Load Settings
   m_players = client->GetPlayers();
   m_pad_mapping = server->GetPadMapping();
-  m_gba_mapping = server->GetGBAMapping();
+  m_gba_enabled = server->GetGBAEnabled();
   m_wii_mapping = server->GetWiimoteMapping();
 
   QStringList players;
@@ -107,7 +107,7 @@ int PadMappingDialog::exec()
   {
     const QSignalBlocker blocker(m_gba_boxes[i]);
 
-    m_gba_boxes[i]->setChecked(m_gba_mapping[i]);
+    m_gba_boxes[i]->setChecked(m_gba_enabled[i]);
   }
 
   return QDialog::exec();
@@ -118,9 +118,9 @@ NetPlay::PadMappingArray PadMappingDialog::GetGCPadArray()
   return m_pad_mapping;
 }
 
-NetPlay::GBAMappingArray PadMappingDialog::GetGBAArray()
+NetPlay::GBAEnabledArray PadMappingDialog::GetGBAArray()
 {
-  return m_gba_mapping;
+  return m_gba_enabled;
 }
 
 NetPlay::PadMappingArray PadMappingDialog::GetWiimoteArray()
@@ -136,7 +136,7 @@ void PadMappingDialog::OnMappingChanged()
     int wii_id = m_wii_boxes[i]->currentIndex();
 
     m_pad_mapping[i] = gc_id > 0 ? m_players[gc_id - 1]->pid : 0;
-    m_gba_mapping[i] = m_gba_boxes[i]->isChecked();
+    m_gba_enabled[i] = m_gba_boxes[i]->isChecked();
     m_wii_mapping[i] = wii_id > 0 ? m_players[wii_id - 1]->pid : 0;
   }
 }

@@ -27,7 +27,7 @@ public:
   int exec() override;
 
   NetPlay::PadMappingArray GetGCPadArray();
-  NetPlay::GBAMappingArray GetGBAArray();
+  NetPlay::GBAEnabledArray GetGBAArray();
   NetPlay::PadMappingArray GetWiimoteArray();
 
 private:
@@ -37,7 +37,7 @@ private:
   void OnMappingChanged();
 
   NetPlay::PadMappingArray m_pad_mapping;
-  NetPlay::GBAMappingArray m_gba_mapping;
+  NetPlay::GBAEnabledArray m_gba_enabled;
   NetPlay::PadMappingArray m_wii_mapping;
 
   QGridLayout* m_main_layout;

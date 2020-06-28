@@ -124,6 +124,8 @@ public:
   // Send and receive pads values
   bool WiimoteUpdate(int _number, u8* data, const u8 size, u8 reporting_mode);
   bool GetNetPads(int pad_nb, bool from_vi, GCPadStatus* pad_status);
+  bool GetGbaData(int pad_nb, GBAStatus* status);
+  bool IsGbaClient();
 
   u64 GetInitialRTCValue() const;
 
@@ -169,6 +171,7 @@ protected:
   Common::SPSCQueue<AsyncQueueEntry, false> m_async_queue;
 
   std::array<Common::SPSCQueue<GCPadStatus>, 4> m_pad_buffer;
+  std::array<Common::SPSCQueue<GBAStatus>, 4> m_gba_buffer;
   std::array<Common::SPSCQueue<NetWiimote>, 4> m_wiimote_buffer;
 
   std::array<GCPadStatus, 4> m_last_pad_status{};
@@ -204,7 +207,7 @@ protected:
   u32 m_current_game = 0;
 
   PadMappingArray m_pad_map;
-  GBAMappingArray m_gba_map;
+  GBAEnabledArray m_gba_enabled;
   PadMappingArray m_wiimote_map;
 
   bool m_is_recording = false;
@@ -255,6 +258,7 @@ private:
   std::thread m_MD5_thread;
   bool m_should_compute_MD5 = false;
   Common::Event m_gc_pad_event;
+  Common::Event m_gba_data_event;
   Common::Event m_wii_pad_event;
   Common::Event m_first_pad_status_received_event;
   Common::Event m_wait_on_input_event;
