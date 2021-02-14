@@ -713,7 +713,7 @@ void Arm64FPRCache::FlushRegister(size_t preg, bool maintain_state)
       if (PPCSTATE_OFF(ps[preg].ps0) <= 504)
       {
         m_float_emit->STP(64, IndexType::Signed, host_reg, host_reg, PPC_REG,
-                          PPCSTATE_OFF(ps[preg].ps0));
+                          u32(PPCSTATE_OFF(ps[preg].ps0)));
       }
       else
       {
