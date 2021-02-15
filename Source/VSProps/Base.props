@@ -49,6 +49,7 @@
       <AdditionalIncludeDirectories>$(ExternalsDir)xxhash;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <AdditionalIncludeDirectories>$(ExternalsDir)zlib;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <AdditionalIncludeDirectories>$(ExternalsDir)zstd\lib;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ExternalsDir)mGBA\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>FMT_HEADER_ONLY=1;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <!--
         It would be a good idea to disable _CRT_SECURE_NO_WARNINGS and get rid of e.g. C string parsing funcs
