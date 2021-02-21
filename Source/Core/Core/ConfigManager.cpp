@@ -206,6 +206,7 @@ void SConfig::SaveCoreSettings(IniFile& ini)
   core->Set("CPUCore", cpu_core);
   core->Set("Fastmem", bFastmem);
   core->Set("CPUThread", bCPUThread);
+  core->Set("GBAThreads", bGBAThreads);
   core->Set("DSPHLE", bDSPHLE);
   core->Set("SyncOnSkipIdle", bSyncGPUOnSkipIdleHack);
   core->Set("SyncGPU", bSyncGPU);
@@ -470,6 +471,7 @@ void SConfig::LoadCoreSettings(IniFile& ini)
   core->Get("DSPHLE", &bDSPHLE, true);
   core->Get("TimingVariance", &iTimingVariance, 40);
   core->Get("CPUThread", &bCPUThread, true);
+  core->Get("GBAThreads", &bGBAThreads, true);
   core->Get("SyncOnSkipIdle", &bSyncGPUOnSkipIdleHack, true);
   core->Get("EnableCheats", &bEnableCheats, false);
   core->Get("SelectedLanguage", &SelectedLanguage, 0);
@@ -737,6 +739,7 @@ void SConfig::LoadDefaults()
   cpu_core = PowerPC::DefaultCPUCore();
   iTimingVariance = 40;
   bCPUThread = false;
+  bGBAThreads = true;
   bSyncGPUOnSkipIdleHack = true;
   bRunCompareServer = false;
   bDSPHLE = true;

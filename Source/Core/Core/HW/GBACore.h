@@ -5,7 +5,11 @@
 #pragma once
 
 #include <array>
+#include <condition_variable>
 #include <memory>
+#include <mutex>
+#include <queue>
+#include <thread>
 #include <vector>
 
 #define PYCPARSE  // Remove static functions from the header
@@ -36,37 +40,59 @@ struct AVStream : mAVStream
 class Core
 {
 public:
-  Core(int device_number);
+  Core(int device_number, bool threaded);
   ~Core();
 
   void Init(u64 gc_ticks);
   void Deinit();
 
-  void SendJoybusCommand(u64 gc_ticks, u8* buffer);
+  void SendJoybusCommand(u64 gc_ticks, u8* buffer, bool sync_only = false);
   std::vector<u8> GetJoybusResponse();
   void Flush();
 
   void DoState(PointerWrap& p);
 
 private:
+  void ThreadLoop();
   void RunUntil(u64 gc_ticks);
   void RunFor(u64 gc_ticks);
+
+  struct Command
+  {
+    u64 ticks;
+    bool sync_only;
+    std::array<u8, 6> buffer;
+  };
+  void RunCommand(Command& command);
+
   void OnKeysRead();
   u16 GetPadStatus();
 
   int m_device_number;
+  bool m_threaded;
 
   mCore* m_core{};
   mTimingEvent m_event{};
   SIODriver m_sio_driver{};
   AVStream m_stream{};
   std::vector<u32> m_video_buffer;
-  std::array<u8, 6> m_command_buffer;
 
   u64 m_last_gc_ticks{};
   u64 m_gc_ticks_remainder{};
   bool m_link_enabled{};
 
   std::unique_ptr<FrontendInterface> m_frontend;
+
+  std::unique_ptr<std::thread> m_thread;
+  bool m_exit_loop{};
+  bool m_idle{};
+  std::mutex m_queue_mutex;
+  std::condition_variable m_command_cv;
+  std::queue<Command> m_command_queue;
+
+  std::mutex m_response_mutex;
+  std::condition_variable m_response_cv;
+  bool m_response_ready{};
+  std::vector<u8> m_response;
 };
 }  // namespace HW::GBA

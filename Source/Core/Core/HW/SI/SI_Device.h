@@ -92,6 +92,9 @@ public:
   // Savestate support
   virtual void DoState(PointerWrap& p);
 
+  // Schedulable event
+  virtual void OnEvent(s64 cycles_late) {}
+
 protected:
   int m_device_number;
   SIDevices m_device_type;

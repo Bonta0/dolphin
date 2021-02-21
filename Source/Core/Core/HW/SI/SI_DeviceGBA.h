@@ -25,6 +25,7 @@ public:
   bool GetData(u32& hi, u32& low) override;
   void SendCommand(u32 command, u8 poll) override;
   void DoState(PointerWrap& p) override;
+  void OnEvent(s64 cycles_late) override;
 
 private:
 
@@ -40,5 +41,6 @@ private:
   u64 m_timestamp_sent{};
 
   HW::GBA::Core m_core;
+  bool m_init;
 };
 }  // namespace SerialInterface

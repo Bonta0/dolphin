@@ -14,6 +14,7 @@
 #include "Common/ChunkFile.h"
 #include "Common/CommonTypes.h"
 #include "Common/FileUtil.h"
+#include "common/Thread.h"
 #include "Core/HW/GBACore.h"
 #include "Core/HW/GBAFrontend.h"
 #include "Core/HW/SI/SI_DeviceGCController.h"
@@ -32,7 +33,7 @@ static std::unique_ptr<FrontendInterface> CreateDummyFrontend(int device_number,
 }
 std::unique_ptr<FrontendInterface> (*s_create_frontend)(int, u32, u32) = CreateDummyFrontend;
 
-Core::Core(int device_number) : m_device_number(device_number)
+Core::Core(int device_number, bool threaded) : m_device_number(device_number), m_threaded(threaded)
 {
 }
 
@@ -117,38 +118,121 @@ void Core::Init(u64 gc_ticks)
   m_frontend = s_create_frontend(m_device_number, width, height);
 
   m_core->reset(m_core);
+
+  if (m_threaded)
+  {
+    m_idle = true;
+    m_exit_loop = false;
+    m_thread = std::make_unique<std::thread>([this] { ThreadLoop(); });
+  }
 }
 
 void Core::Deinit()
 {
-  Flush();
+  if (m_threaded)
+  {
+    Flush();
+    m_exit_loop = true;
+    {
+      std::lock_guard<std::mutex> lock(m_queue_mutex);
+      m_command_cv.notify_one();
+    }
+    m_thread->join();
+    m_thread.reset();
+  }
   m_frontend->Stop();
   mCoreConfigDeinit(&m_core->config);
   m_core->deinit(m_core);
 }
 
-void Core::SendJoybusCommand(u64 gc_ticks, u8* buffer)
+void Core::SendJoybusCommand(u64 gc_ticks, u8* buffer, bool sync_only)
 {
-  std::copy(buffer, buffer + 5, m_command_buffer.begin());
-  RunUntil(gc_ticks);
+  Command command{};
+  command.ticks = gc_ticks;
+  command.sync_only = sync_only;
+  if (buffer)
+    std::copy(buffer, buffer + 5, command.buffer.begin());
+
+  if (m_threaded)
+  {
+    std::lock_guard<std::mutex> lock(m_queue_mutex);
+    m_command_queue.push(command);
+    m_idle = false;
+    m_command_cv.notify_one();
+  }
+  else
+  {
+    RunCommand(command);
+  }
 }
 
 std::vector<u8> Core::GetJoybusResponse()
 {
-  std::vector<u8> response_buffer;
-  if (m_link_enabled)
+  if (m_threaded)
   {
-    int recvd = GBASIOJOYSendCommand(
-        &m_sio_driver, static_cast<GBASIOJOYCommand>(m_command_buffer[0]), &m_command_buffer[1]);
-    std::copy(m_command_buffer.begin() + 1, m_command_buffer.begin() + 1 + recvd,
-              std::back_inserter(response_buffer));
-    RunFor(response_buffer.size() * SystemTimers::GetTicksPerSecond() / BYTES_PER_SECOND);
+    std::unique_lock<std::mutex> lock(m_response_mutex);
+    m_response_cv.wait(lock, [&] { return m_response_ready; });
   }
-  return response_buffer;
+  m_response_ready = false;
+  return m_response;
 }
 
 void Core::Flush()
 {
+  if (!m_threaded)
+    return;
+  std::unique_lock<std::mutex> lock(m_queue_mutex);
+  m_response_cv.wait(lock, [&] { return m_idle; });
+}
+
+void Core::ThreadLoop()
+{
+  Common::SetCurrentThreadName(fmt::format("GBA{}", m_device_number + 1).c_str());
+  std::unique_lock<std::mutex> queue_lock(m_queue_mutex);
+  while (true)
+  {
+    m_command_cv.wait(queue_lock, [&] { return !m_command_queue.empty() || m_exit_loop; });
+    if (m_exit_loop)
+      break;
+    Command command{m_command_queue.front()};
+    m_command_queue.pop();
+    queue_lock.unlock();
+
+    RunCommand(command);
+
+    queue_lock.lock();
+    if (m_command_queue.empty())
+      m_idle = true;
+    m_response_cv.notify_one();
+  }
+}
+
+void Core::RunCommand(Command& command)
+{
+  RunUntil(command.ticks);
+  if (!command.sync_only)
+  {
+    u64 run_ahead = 0;
+    m_response.clear();
+    if (m_link_enabled)
+    {
+      int recvd = GBASIOJOYSendCommand(
+          &m_sio_driver, static_cast<GBASIOJOYCommand>(command.buffer[0]), &command.buffer[1]);
+      std::copy(command.buffer.begin() + 1, command.buffer.begin() + 1 + recvd,
+                std::back_inserter(m_response));
+      run_ahead = m_response.size() * SystemTimers::GetTicksPerSecond() / BYTES_PER_SECOND;
+    }
+    if (m_threaded)
+    {
+      std::lock_guard<std::mutex> response_lock(m_response_mutex);
+      m_response_ready = true;
+      m_response_cv.notify_one();
+    }
+    else
+      m_response_ready = true;
+    if (run_ahead)
+      RunFor(run_ahead);
+  }
 }
 
 void Core::RunUntil(u64 gc_ticks)
@@ -185,10 +269,11 @@ void Core::DoState(PointerWrap& p)
   Flush();
 
   p.Do(m_video_buffer);
-  p.Do(m_command_buffer);
   p.Do(m_last_gc_ticks);
   p.Do(m_gc_ticks_remainder);
   p.Do(m_link_enabled);
+  p.Do(m_response_ready);
+  p.Do(m_response);
 
   std::vector<u8> core_state(m_core->stateSize(m_core));
   if (p.GetMode() == PointerWrap::MODE_WRITE || p.GetMode() == PointerWrap::MODE_VERIFY)

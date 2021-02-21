@@ -612,38 +612,36 @@ static void EmuThread(std::unique_ptr<BootParameters> boot, WindowSystemInfo wsi
     PowerPC::SetMode(PowerPC::CoreMode::Interpreter);
   }
 
+  HW::PostInit();
+  Common::ScopeGuard hw_post_guard{[] { HW::PreShutdown(); }};
+
+  AudioCommon::PostInitSoundStream();
+
+  // ENTER THE VIDEO THREAD LOOP
+  if (core_parameter.bCPUThread)
   {
-    HW::PostInit();
-    Common::ScopeGuard hw_post_guard{[] { HW::PreShutdown(); }};
+    // This thread, after creating the EmuWindow, spawns a CPU
+    // thread, and then takes over and becomes the video thread
+    Common::SetCurrentThreadName("Video thread");
+    UndeclareAsCPUThread();
 
-    AudioCommon::PostInitSoundStream();
+    // Spawn the CPU thread. The CPU thread will signal the event that boot is complete.
+    s_cpu_thread = std::thread(cpuThreadFunc, savestate_path, delete_savestate);
 
-    // ENTER THE VIDEO THREAD LOOP
-    if (core_parameter.bCPUThread)
-    {
-      // This thread, after creating the EmuWindow, spawns a CPU
-      // thread, and then takes over and becomes the video thread
-      Common::SetCurrentThreadName("Video thread");
-      UndeclareAsCPUThread();
+    // become the GPU thread
+    Fifo::RunGpuLoop();
 
-      // Spawn the CPU thread. The CPU thread will signal the event that boot is complete.
-      s_cpu_thread = std::thread(cpuThreadFunc, savestate_path, delete_savestate);
+    // We have now exited the Video Loop
+    INFO_LOG_FMT(CONSOLE, "{}", StopMessage(false, "Video Loop Ended"));
 
-      // become the GPU thread
-      Fifo::RunGpuLoop();
-
-      // We have now exited the Video Loop
-      INFO_LOG_FMT(CONSOLE, "{}", StopMessage(false, "Video Loop Ended"));
-
-      // Join with the CPU thread.
-      s_cpu_thread.join();
-      INFO_LOG_FMT(CONSOLE, "{}", StopMessage(true, "CPU thread stopped."));
-    }
-    else  // SingleCore mode
-    {
-      // Become the CPU thread
-      cpuThreadFunc(savestate_path, delete_savestate);
-    }
+    // Join with the CPU thread.
+    s_cpu_thread.join();
+    INFO_LOG_FMT(CONSOLE, "{}", StopMessage(true, "CPU thread stopped."));
+  }
+  else  // SingleCore mode
+  {
+    // Become the CPU thread
+    cpuThreadFunc(savestate_path, delete_savestate);
   }
 
 #ifdef USE_GDBSTUB
