@@ -59,6 +59,17 @@ void Init()
   }
 }
 
+void PostInit()
+{
+  AudioInterface::PostInit();
+  SerialInterface::PostInit();
+}
+
+void PreShutdown()
+{
+  SerialInterface::PreShutdown();
+}
+
 void Shutdown()
 {
   // IOS should always be shut down regardless of bWii because it can be running in GC mode (MIOS).

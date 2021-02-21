@@ -20,7 +20,7 @@
 #include "Core/CoreTiming.h"
 #include "Core/HW/MMIO.h"
 #include "Core/HW/ProcessorInterface.h"
-#include "Core/HW/SI/SI_DeviceGBA.h"
+#include "Core/HW/SI/SI_Device.h"
 #include "Core/HW/SystemTimers.h"
 #include "Core/Movie.h"
 #include "Core/NetPlayProto.h"
@@ -419,11 +419,28 @@ void Init()
   s_tranfer_pending_event = CoreTiming::RegisterEvent("SITransferPending", RunSIBuffer);
 }
 
+void PostInit()
+{
+  for (int i = 0; i < MAX_SI_CHANNELS; i++)
+  {
+    if (s_channel[i].device)
+      s_channel[i].device->PostInit();
+  }
+}
+
+void PreShutdown()
+{
+  for (int i = 0; i < MAX_SI_CHANNELS; i++)
+  {
+    if (s_channel[i].device)
+      s_channel[i].device->PreShutdown();
+  }
+}
+
 void Shutdown()
 {
   for (int i = 0; i < MAX_SI_CHANNELS; i++)
     RemoveDevice(i);
-  GBAConnectionWaiter_Shutdown();
 }
 
 void RegisterMMIO(MMIO::Mapping* mmio, u32 base)

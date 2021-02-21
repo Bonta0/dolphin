@@ -26,6 +26,7 @@
 #include "Core/Core.h"
 #include "Core/DolphinAnalytics.h"
 
+#include "DolphinQt/GBAWidget.h"
 #include "DolphinQt/Host.h"
 #include "DolphinQt/MainWindow.h"
 #include "DolphinQt/QtUtils/ModalMessageBox.h"
@@ -171,6 +172,8 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
   UICommon::Init();
   Resources::Init();
   Settings::Instance().SetBatchModeEnabled(options.is_set("batch"));
+
+  EnableGBAFrontend();
 
   // Hook up alerts from core
   Common::RegisterMsgAlertHandler(QtMsgAlertHandler);

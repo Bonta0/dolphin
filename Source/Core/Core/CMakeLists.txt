@@ -193,6 +193,9 @@ add_library(core
   HW/EXI/EXI_DeviceMic.h
   HW/EXI/EXI.cpp
   HW/EXI/EXI.h
+  HW/GBACore.cpp
+  HW/GBACore.h
+  HW/GBAFrontend.h
   HW/GCKeyboard.cpp
   HW/GCKeyboard.h
   HW/GCKeyboardEmu.cpp

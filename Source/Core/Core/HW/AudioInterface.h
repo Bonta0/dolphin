@@ -17,6 +17,7 @@ class Mapping;
 namespace AudioInterface
 {
 void Init();
+void PostInit();
 void Shutdown();
 void DoState(PointerWrap& p);
 bool IsPlaying();

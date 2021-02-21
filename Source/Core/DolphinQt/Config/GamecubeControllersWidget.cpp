@@ -107,7 +107,7 @@ void GamecubeControllersWidget::OnGCTypeChanged(int type)
     if (m_gc_controller_boxes[i] == box)
     {
       const int index = box->currentIndex();
-      m_gc_buttons[i]->setEnabled(index != 0 && index != 6);
+      m_gc_buttons[i]->setEnabled(index != 0);
       return;
     }
   }
@@ -130,7 +130,9 @@ void GamecubeControllersWidget::OnGCPadConfigure()
   {
   case 0:  // None
   case 6:  // GBA
-    return;
+    //TODO: GBA should have its own config
+    type = MappingWindow::Type::MAPPING_GCPAD;
+    break;
   case 1:  // Standard Controller
     type = MappingWindow::Type::MAPPING_GCPAD;
     break;
@@ -167,7 +169,7 @@ void GamecubeControllersWidget::LoadSettings()
     if (gc_index)
     {
       m_gc_controller_boxes[i]->setCurrentIndex(*gc_index);
-      m_gc_buttons[i]->setEnabled(*gc_index != 0 && *gc_index != 6);
+      m_gc_buttons[i]->setEnabled(*gc_index != 0);
     }
   }
 }

@@ -612,31 +612,38 @@ static void EmuThread(std::unique_ptr<BootParameters> boot, WindowSystemInfo wsi
     PowerPC::SetMode(PowerPC::CoreMode::Interpreter);
   }
 
-  // ENTER THE VIDEO THREAD LOOP
-  if (core_parameter.bCPUThread)
   {
-    // This thread, after creating the EmuWindow, spawns a CPU
-    // thread, and then takes over and becomes the video thread
-    Common::SetCurrentThreadName("Video thread");
-    UndeclareAsCPUThread();
+    HW::PostInit();
+    Common::ScopeGuard hw_post_guard{[] { HW::PreShutdown(); }};
 
-    // Spawn the CPU thread. The CPU thread will signal the event that boot is complete.
-    s_cpu_thread = std::thread(cpuThreadFunc, savestate_path, delete_savestate);
+    AudioCommon::PostInitSoundStream();
 
-    // become the GPU thread
-    Fifo::RunGpuLoop();
+    // ENTER THE VIDEO THREAD LOOP
+    if (core_parameter.bCPUThread)
+    {
+      // This thread, after creating the EmuWindow, spawns a CPU
+      // thread, and then takes over and becomes the video thread
+      Common::SetCurrentThreadName("Video thread");
+      UndeclareAsCPUThread();
 
-    // We have now exited the Video Loop
-    INFO_LOG_FMT(CONSOLE, "{}", StopMessage(false, "Video Loop Ended"));
+      // Spawn the CPU thread. The CPU thread will signal the event that boot is complete.
+      s_cpu_thread = std::thread(cpuThreadFunc, savestate_path, delete_savestate);
 
-    // Join with the CPU thread.
-    s_cpu_thread.join();
-    INFO_LOG_FMT(CONSOLE, "{}", StopMessage(true, "CPU thread stopped."));
-  }
-  else  // SingleCore mode
-  {
-    // Become the CPU thread
-    cpuThreadFunc(savestate_path, delete_savestate);
+      // become the GPU thread
+      Fifo::RunGpuLoop();
+
+      // We have now exited the Video Loop
+      INFO_LOG_FMT(CONSOLE, "{}", StopMessage(false, "Video Loop Ended"));
+
+      // Join with the CPU thread.
+      s_cpu_thread.join();
+      INFO_LOG_FMT(CONSOLE, "{}", StopMessage(true, "CPU thread stopped."));
+    }
+    else  // SingleCore mode
+    {
+      // Become the CPU thread
+      cpuThreadFunc(savestate_path, delete_savestate);
+    }
   }
 
 #ifdef USE_GDBSTUB
