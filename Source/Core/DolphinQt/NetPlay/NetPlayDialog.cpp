@@ -282,6 +282,7 @@ void NetPlayDialog::ConnectWidgets()
     m_pad_mapping->exec();
 
     Settings::Instance().GetNetPlayServer()->SetPadMapping(m_pad_mapping->GetGCPadArray());
+    Settings::Instance().GetNetPlayServer()->SetGBAEnabled(m_pad_mapping->GetGBAArray());
     Settings::Instance().GetNetPlayServer()->SetWiimoteMapping(m_pad_mapping->GetWiimoteArray());
   });
 
@@ -658,12 +659,13 @@ void NetPlayDialog::UpdateGUI()
   m_players_list->setRowCount(m_player_count);
 
   const auto get_mapping_string = [](const NetPlay::Player* player,
-                                     const NetPlay::PadMappingArray& array) {
+                                     const NetPlay::PadMappingArray& array,
+                                     const NetPlay::GBAEnabledArray& gbas, bool check_gba) {
     std::string str;
     for (size_t i = 0; i < array.size(); i++)
     {
       if (player->pid == array[i])
-        str += std::to_string(i + 1);
+        str += (check_gba && gbas[i]) ? "G" : std::to_string(i + 1);
       else
         str += '-';
     }
@@ -686,9 +688,9 @@ void NetPlayDialog::UpdateGUI()
                                                  player_status.at(p->game_status) :
                                                  QStringLiteral("?"));
     auto* ping_item = new QTableWidgetItem(QStringLiteral("%1 ms").arg(p->ping));
-    auto* mapping_item = new QTableWidgetItem(
-        QString::fromStdString(get_mapping_string(p, client->GetPadMapping()) +
-                               get_mapping_string(p, client->GetWiimoteMapping())));
+    auto* mapping_item = new QTableWidgetItem(QString::fromStdString(
+        get_mapping_string(p, client->GetPadMapping(), client->GetEnabledGBAs(), true) +
+        get_mapping_string(p, client->GetWiimoteMapping(), client->GetEnabledGBAs(), false)));
     auto* revision_item = new QTableWidgetItem(QString::fromStdString(p->revision));
 
     for (auto* item : {name_item, status_item, ping_item, mapping_item, revision_item})

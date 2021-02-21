@@ -141,6 +141,7 @@ public:
   bool DoAllPlayersHaveGame();
 
   const PadMappingArray& GetPadMapping() const;
+  const GBAEnabledArray& GetEnabledGBAs() const;
   const PadMappingArray& GetWiimoteMapping() const;
 
   void AdjustPadBufferSize(unsigned int size);
@@ -202,6 +203,7 @@ protected:
   u32 m_current_game = 0;
 
   PadMappingArray m_pad_map;
+  GBAEnabledArray m_gba_enabled;
   PadMappingArray m_wiimote_map;
 
   bool m_is_recording = false;

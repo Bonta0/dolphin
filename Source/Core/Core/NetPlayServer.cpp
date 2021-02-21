@@ -113,6 +113,7 @@ NetPlayServer::NetPlayServer(const u16 port, const bool forward_port, NetPlayUI*
   }
 
   m_pad_map.fill(0);
+  m_gba_enabled.fill(false);
   m_wiimote_map.fill(0);
 
   if (traversal_config.use_traversal)
@@ -474,6 +475,7 @@ unsigned int NetPlayServer::OnConnect(ENetPeer* socket, sf::Packet& rpac)
     std::lock_guard lkp(m_crit.players);
     m_players.emplace(*PeerPlayerId(player.socket), std::move(player));
     UpdatePadMapping();  // sync pad mappings with everyone
+    UpdateGBAEnabled();
     UpdateWiimoteMapping();
   }
 
@@ -524,12 +526,14 @@ unsigned int NetPlayServer::OnDisconnect(const Client& player)
   // alert other players of disconnect
   SendToClients(spac);
 
-  for (PlayerId& mapping : m_pad_map)
+  for (int i = 0; i < m_pad_map.size(); ++i)
   {
-    if (mapping == pid)
+    if (m_pad_map[i] == pid)
     {
-      mapping = 0;
+      m_pad_map[i] = 0;
+      m_gba_enabled[i] = false;
       UpdatePadMapping();
+      UpdateGBAEnabled();
     }
   }
 
@@ -551,6 +555,11 @@ PadMappingArray NetPlayServer::GetPadMapping() const
   return m_pad_map;
 }
 
+GBAEnabledArray NetPlayServer::GetGBAEnabled() const
+{
+  return m_gba_enabled;
+}
+
 PadMappingArray NetPlayServer::GetWiimoteMapping() const
 {
   return m_wiimote_map;
@@ -561,6 +570,13 @@ void NetPlayServer::SetPadMapping(const PadMappingArray& mappings)
 {
   m_pad_map = mappings;
   UpdatePadMapping();
+}
+
+// called from ---GUI--- thread
+void NetPlayServer::SetGBAEnabled(const GBAEnabledArray& mappings)
+{
+  m_gba_enabled = mappings;
+  UpdateGBAEnabled();
 }
 
 // called from ---GUI--- thread
@@ -576,6 +592,18 @@ void NetPlayServer::UpdatePadMapping()
   sf::Packet spac;
   spac << (MessageId)NP_MSG_PAD_MAPPING;
   for (PlayerId mapping : m_pad_map)
+  {
+    spac << mapping;
+  }
+  SendToClients(spac);
+}
+
+// called from ---GUI--- thread and ---NETPLAY--- thread
+void NetPlayServer::UpdateGBAEnabled()
+{
+  sf::Packet spac;
+  spac << (MessageId)NP_MSG_GBA_ENABLED;
+  for (PlayerId mapping : m_gba_enabled)
   {
     spac << mapping;
   }
