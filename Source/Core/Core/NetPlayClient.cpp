@@ -1537,13 +1537,15 @@ bool NetPlayClient::StartGame(const std::string& path)
     if (Movie::IsReadOnly())
       Movie::SetReadOnly(false);
 
-    u8 controllers_mask = 0;
+    int controllers_mask = 0;
     for (unsigned int i = 0; i < 4; ++i)
     {
       if (m_pad_map[i] > 0)
         controllers_mask |= (1 << i);
       if (m_wiimote_map[i] > 0)
         controllers_mask |= (1 << (i + 4));
+      if (m_gba_enabled[i] && m_pad_map[i] > 0)
+        controllers_mask |= (1 << (i + 8));
     }
     Movie::BeginRecordingInput(controllers_mask);
   }

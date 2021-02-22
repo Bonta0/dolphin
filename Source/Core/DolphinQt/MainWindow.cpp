@@ -1651,6 +1651,9 @@ void MainWindow::OnStartRecording()
 
     if (WiimoteCommon::GetSource(i) != WiimoteSource::None)
       controllers |= (1 << (i + 4));
+
+    if (SConfig::GetInstance().m_SIDevice[i] == SerialInterface::SIDEVICE_GC_GBA)
+      controllers |= (1 << (i + 8));
   }
 
   if (Movie::BeginRecordingInput(controllers))
