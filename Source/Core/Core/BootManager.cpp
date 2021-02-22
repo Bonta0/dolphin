@@ -74,7 +74,6 @@ public:
 private:
   bool valid;
   bool bCPUThread;
-  bool bGBAThreads;
   bool bJITFollowBranch;
   bool bEnableCheats;
   bool bSyncGPUOnSkipIdleHack;
@@ -109,7 +108,6 @@ void ConfigCache::SaveConfig(const SConfig& config)
   valid = true;
 
   bCPUThread = config.bCPUThread;
-  bGBAThreads = config.bGBAThreads;
   bJITFollowBranch = config.bJITFollowBranch;
   bEnableCheats = config.bEnableCheats;
   bSyncGPUOnSkipIdleHack = config.bSyncGPUOnSkipIdleHack;
@@ -155,7 +153,6 @@ void ConfigCache::RestoreConfig(SConfig* config)
   valid = false;
 
   config->bCPUThread = bCPUThread;
-  config->bGBAThreads = bGBAThreads;
   config->bJITFollowBranch = bJITFollowBranch;
   config->bEnableCheats = bEnableCheats;
   config->bSyncGPUOnSkipIdleHack = bSyncGPUOnSkipIdleHack;
@@ -257,7 +254,6 @@ bool BootCore(std::unique_ptr<BootParameters> boot, const WindowSystemInfo& wsi)
     IniFile::Section* controls_section = game_ini.GetOrCreateSection("Controls");
 
     core_section->Get("CPUThread", &StartUp.bCPUThread, StartUp.bCPUThread);
-    core_section->Get("GBAThreads", &StartUp.bGBAThreads, StartUp.bGBAThreads);
     core_section->Get("JITFollowBranch", &StartUp.bJITFollowBranch, StartUp.bJITFollowBranch);
     core_section->Get("EnableCheats", &StartUp.bEnableCheats, StartUp.bEnableCheats);
     core_section->Get("SyncOnSkipIdle", &StartUp.bSyncGPUOnSkipIdleHack,
