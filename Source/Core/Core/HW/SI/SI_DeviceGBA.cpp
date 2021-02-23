@@ -2,7 +2,6 @@
 // Licensed under GPLv2+
 // Refer to the license.txt file included.
 
-#include <utility>
 #include <vector>
 
 #include "Common/ChunkFile.h"
@@ -26,36 +25,28 @@ int s_num_connected = 0;
 
 // --- GameBoy Advance "Link Cable" ---
 
-static std::pair<int, int> GetTransferSize(u8 cmd)
+static int GetTransferTime(u8 cmd)
 {
+  u64 bytes_transferred = 0;
+
   switch (cmd)
   {
   case GBASIOJOYCommand::JOY_RESET:
   case GBASIOJOYCommand::JOY_POLL:
-    return {1, 3};
+    bytes_transferred = 4;
+    break;
   case GBASIOJOYCommand::JOY_TRANS:
-    return {1, 5};
+    bytes_transferred = 6;
+    break;
   case GBASIOJOYCommand::JOY_RECV:
-    return {5, 1};
+    bytes_transferred = 1;
+    break;
+  default:
+    bytes_transferred = 1;
+    break;
   }
-  return {1, 0};
-}
-
-static int GetSendTime(u8 cmd)
-{
-  return static_cast<int>(GetTransferSize(cmd).first * SystemTimers::GetTicksPerSecond() /
-                          (s_num_connected * HW::GBA::BYTES_PER_SECOND));
-}
-
-static int GetResponseTime(u8 cmd)
-{
-  return static_cast<int>(GetTransferSize(cmd).second * SystemTimers::GetTicksPerSecond() /
-                          HW::GBA::BYTES_PER_SECOND);
-}
-
-static int GetTransferTime(u8 cmd)
-{
-  return GetSendTime(cmd) + GetResponseTime(cmd);
+  return static_cast<int>(bytes_transferred * SystemTimers::GetTicksPerSecond() /
+                          (std::max(s_num_connected, 1) * HW::GBA::BYTES_PER_SECOND));
 }
 
 static s64 GetSyncInterval()

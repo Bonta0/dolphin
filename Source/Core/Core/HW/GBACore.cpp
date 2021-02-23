@@ -222,7 +222,7 @@ void Core::RunCommand(Command& command)
                 std::back_inserter(m_response));
       run_ahead = m_response.size() * SystemTimers::GetTicksPerSecond() / BYTES_PER_SECOND;
     }
-    if (m_threaded)
+    if (m_threaded && !m_response_ready)
     {
       std::lock_guard<std::mutex> response_lock(m_response_mutex);
       m_response_ready = true;
