@@ -140,7 +140,8 @@ void RunOnCPUThread(std::function<void()> function, bool wait_for_completion);
 
 // for calling back into UI code without introducing a dependency on it in core
 using StateChangedCallbackFunc = std::function<void(Core::State)>;
-void SetOnStateChangedCallback(StateChangedCallbackFunc callback);
+int RegisterStateChangedCallback(StateChangedCallbackFunc callback);
+void UnregisterStateChangedCallback(int id);
 
 // Run on the Host thread when the factors change. [NOT THREADSAFE]
 void UpdateWantDeterminism(bool initial = false);

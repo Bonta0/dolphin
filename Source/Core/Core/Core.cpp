@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <atomic>
 #include <cstring>
+#include <map>
 #include <mutex>
 #include <queue>
 #include <utility>
@@ -103,7 +104,7 @@ static bool s_hardware_initialized = false;
 static bool s_is_started = false;
 static Common::Flag s_is_booting;
 static std::thread s_emu_thread;
-static StateChangedCallbackFunc s_on_state_changed_callback;
+static std::map<int, StateChangedCallbackFunc> s_on_state_changed_callbacks;
 
 static std::thread s_cpu_thread;
 static bool s_request_refresh_info = false;
@@ -127,6 +128,7 @@ static Common::Event s_cpu_thread_job_finished;
 static thread_local bool tls_is_cpu_thread = false;
 
 static void EmuThread(std::unique_ptr<BootParameters> boot, WindowSystemInfo wsi);
+static void NotifyStateChanged(State state);
 
 bool GetIsThrottlerTempDisabled()
 {
@@ -269,9 +271,8 @@ void Stop()  // - Hammertime!
 
   s_is_stopping = true;
 
-  // Notify state changed callback
-  if (s_on_state_changed_callback)
-    s_on_state_changed_callback(State::Stopping);
+  // Notify state changed callbacks
+  NotifyStateChanged(State::Stopping);
 
   // Dump left over jobs
   HostDispatchJobs();
@@ -424,16 +425,14 @@ static void FifoPlayerThread(const std::optional<std::string>& savestate_path,
 static void EmuThread(std::unique_ptr<BootParameters> boot, WindowSystemInfo wsi)
 {
   const SConfig& core_parameter = SConfig::GetInstance();
-  if (s_on_state_changed_callback)
-    s_on_state_changed_callback(State::Starting);
+  NotifyStateChanged(State::Starting);
   Common::ScopeGuard flag_guard{[] {
     s_is_booting.Clear();
     s_is_started = false;
     s_is_stopping = false;
     s_wants_determinism = false;
 
-    if (s_on_state_changed_callback)
-      s_on_state_changed_callback(State::Uninitialized);
+    NotifyStateChanged(State::Uninitialized);
 
     INFO_LOG_FMT(CONSOLE, "Stop\t\t---- Shutdown complete ----");
   }};
@@ -677,8 +676,7 @@ void SetState(State state)
     break;
   }
 
-  if (s_on_state_changed_callback)
-    s_on_state_changed_callback(GetState());
+  NotifyStateChanged(GetState());
 }
 
 State GetState()
@@ -901,8 +899,7 @@ void Callback_NewField()
     {
       s_frame_step = false;
       CPU::Break();
-      if (s_on_state_changed_callback)
-        s_on_state_changed_callback(Core::GetState());
+      NotifyStateChanged(Core::GetState());
     }
   }
 }
@@ -999,9 +996,24 @@ void Shutdown()
   HostDispatchJobs();
 }
 
-void SetOnStateChangedCallback(StateChangedCallbackFunc callback)
+int RegisterStateChangedCallback(StateChangedCallbackFunc callback)
 {
-  s_on_state_changed_callback = std::move(callback);
+  int id = s_on_state_changed_callbacks.empty() ?
+               0 :
+               std::prev(s_on_state_changed_callbacks.end())->first + 1;
+  s_on_state_changed_callbacks[id] = std::move(callback);
+  return id;
+}
+
+void UnregisterStateChangedCallback(int id)
+{
+  s_on_state_changed_callbacks.erase(id);
+}
+
+static void NotifyStateChanged(State state)
+{
+  std::for_each(s_on_state_changed_callbacks.begin(), s_on_state_changed_callbacks.end(),
+                [state](const auto& pair) { pair.second(state); });
 }
 
 void UpdateWantDeterminism(bool initial)
