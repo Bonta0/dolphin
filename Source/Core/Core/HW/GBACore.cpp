@@ -34,20 +34,10 @@ static std::unique_ptr<FrontendInterface> CreateDummyFrontend(int device_number,
 }
 std::unique_ptr<FrontendInterface> (*s_create_frontend)(int, u32, u32) = CreateDummyFrontend;
 
-Core::Core(int device_number, bool threaded) : m_device_number(device_number), m_threaded(threaded)
+Core::Core(int device_number, bool threaded, u64 gc_ticks)
+    : m_device_number(device_number), m_threaded(threaded), m_last_gc_ticks(gc_ticks),
+      m_gc_ticks_remainder(0), m_link_enabled(false)
 {
-}
-
-Core::~Core()
-{
-}
-
-void Core::Init(u64 gc_ticks)
-{
-  m_last_gc_ticks = gc_ticks;
-  m_gc_ticks_remainder = 0;
-  m_link_enabled = false;
-
   m_core = mCoreCreate(mPlatform::mPLATFORM_GBA);
   m_core->init(m_core);
 
@@ -129,7 +119,7 @@ void Core::Init(u64 gc_ticks)
   m_state_callback_id = ::Core::RegisterStateChangedCallback([this](auto state) { Flush(); });
 }
 
-void Core::Deinit()
+Core::~Core()
 {
   ::Core::UnregisterStateChangedCallback(m_state_callback_id);
   if (m_threaded)

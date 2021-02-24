@@ -40,11 +40,8 @@ struct AVStream : mAVStream
 class Core
 {
 public:
-  Core(int device_number, bool threaded);
+  Core(int device_number, bool threaded, u64 gc_ticks);
   ~Core();
-
-  void Init(u64 gc_ticks);
-  void Deinit();
 
   void SendJoybusCommand(u64 gc_ticks, u8* buffer, bool sync_only = false);
   std::vector<u8> GetJoybusResponse();

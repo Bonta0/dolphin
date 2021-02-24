@@ -55,33 +55,16 @@ static s64 GetSyncInterval()
 }
 
 CSIDevice_GBA::CSIDevice_GBA(SIDevices device, int device_number)
-    : ISIDevice(device, device_number), m_core(device_number, SConfig::GetInstance().bGBAThreads),
-      m_init(false)
+    : ISIDevice(device, device_number),
+      m_core(device_number, SConfig::GetInstance().bGBAThreads, CoreTiming::GetTicks())
 {
-  if (Core::IsRunningAndStarted())
-    PostInit();
   ++s_num_connected;
 }
 
 CSIDevice_GBA::~CSIDevice_GBA()
 {
-  RemoveEvent(m_device_number);
-
-  if (m_init)
-    PreShutdown();
   --s_num_connected;
-}
-
-void CSIDevice_GBA::PostInit()
-{
-  m_core.Init(CoreTiming::GetTicks());
-  m_init = true;
-}
-
-void CSIDevice_GBA::PreShutdown()
-{
-  m_init = false;
-  m_core.Deinit();
+  RemoveEvent(m_device_number);
 }
 
 int CSIDevice_GBA::RunBuffer(u8* buffer, int request_length)

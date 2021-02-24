@@ -9,8 +9,6 @@ class PointerWrap;
 namespace HW
 {
 void Init();
-void PostInit();
-void PreShutdown();
 void Shutdown();
 void DoState(PointerWrap& p);
 }  // namespace HW

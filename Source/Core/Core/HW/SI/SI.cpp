@@ -446,24 +446,6 @@ void Init()
   s_si_buffer = {};
 }
 
-void PostInit()
-{
-  for (int i = 0; i < MAX_SI_CHANNELS; i++)
-  {
-    if (s_channel[i].device)
-      s_channel[i].device->PostInit();
-  }
-}
-
-void PreShutdown()
-{
-  for (int i = 0; i < MAX_SI_CHANNELS; i++)
-  {
-    if (s_channel[i].device)
-      s_channel[i].device->PreShutdown();
-  }
-}
-
 void Shutdown()
 {
   for (int i = 0; i < MAX_SI_CHANNELS; i++)

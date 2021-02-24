@@ -18,8 +18,6 @@ public:
   CSIDevice_GBA(SIDevices device, int device_number);
   ~CSIDevice_GBA();
 
-  void PostInit() override;
-  void PreShutdown() override;
   int RunBuffer(u8* buffer, int request_length) override;
   int TransferInterval() override;
   bool GetData(u32& hi, u32& low) override;
@@ -41,6 +39,5 @@ private:
   u64 m_timestamp_sent{};
 
   HW::GBA::Core m_core;
-  bool m_init;
 };
 }  // namespace SerialInterface

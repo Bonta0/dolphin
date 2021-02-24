@@ -76,9 +76,6 @@ public:
   int GetDeviceNumber() const;
   SIDevices GetDeviceType() const;
 
-  virtual void PostInit() {}
-  virtual void PreShutdown() {}
-
   // Run the SI Buffer
   virtual int RunBuffer(u8* buffer, int request_length);
   virtual int TransferInterval();
