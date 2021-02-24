@@ -15,6 +15,7 @@
 #include "Common/CommonTypes.h"
 #include "Common/FileUtil.h"
 #include "common/Thread.h"
+#include "Core/Core.h"
 #include "Core/HW/GBACore.h"
 #include "Core/HW/GBAFrontend.h"
 #include "Core/HW/SI/SI_DeviceGCController.h"
@@ -125,10 +126,12 @@ void Core::Init(u64 gc_ticks)
     m_exit_loop = false;
     m_thread = std::make_unique<std::thread>([this] { ThreadLoop(); });
   }
+  m_state_callback_id = ::Core::RegisterStateChangedCallback([this](auto state) { Flush(); });
 }
 
 void Core::Deinit()
 {
+  ::Core::UnregisterStateChangedCallback(m_state_callback_id);
   if (m_threaded)
   {
     Flush();

@@ -48,7 +48,6 @@ public:
 
   void SendJoybusCommand(u64 gc_ticks, u8* buffer, bool sync_only = false);
   std::vector<u8> GetJoybusResponse();
-  void Flush();
 
   void DoState(PointerWrap& p);
 
@@ -56,6 +55,7 @@ private:
   void ThreadLoop();
   void RunUntil(u64 gc_ticks);
   void RunFor(u64 gc_ticks);
+  void Flush();
 
   struct Command
   {
@@ -84,6 +84,7 @@ private:
   std::unique_ptr<FrontendInterface> m_frontend;
 
   std::unique_ptr<std::thread> m_thread;
+  int m_state_callback_id;
   bool m_exit_loop{};
   bool m_idle{};
   std::mutex m_queue_mutex;
