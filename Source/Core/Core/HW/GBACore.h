@@ -66,7 +66,6 @@ private:
   u16 GetPadStatus();
 
   int m_device_number;
-  bool m_threaded;
 
   mCore* m_core{};
   mTimingEvent m_event{};
@@ -81,7 +80,6 @@ private:
   std::unique_ptr<FrontendInterface> m_frontend;
 
   std::unique_ptr<std::thread> m_thread;
-  int m_state_callback_id;
   bool m_exit_loop{};
   bool m_idle{};
   std::mutex m_queue_mutex;

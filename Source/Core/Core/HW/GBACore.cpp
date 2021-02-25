@@ -20,6 +20,7 @@
 #include "Core/HW/GBAFrontend.h"
 #include "Core/HW/SI/SI_DeviceGCController.h"
 #include "Core/HW/SystemTimers.h"
+#include "Core/Movie.h"
 #include "Core/NetPlayProto.h"
 
 namespace HW::GBA
@@ -35,8 +36,8 @@ static std::unique_ptr<FrontendInterface> CreateDummyFrontend(int device_number,
 std::unique_ptr<FrontendInterface> (*s_create_frontend)(int, u32, u32) = CreateDummyFrontend;
 
 Core::Core(int device_number, bool threaded, u64 gc_ticks)
-    : m_device_number(device_number), m_threaded(threaded), m_last_gc_ticks(gc_ticks),
-      m_gc_ticks_remainder(0), m_link_enabled(false)
+    : m_device_number(device_number), m_last_gc_ticks(gc_ticks), m_gc_ticks_remainder(0),
+      m_link_enabled(false)
 {
   m_core = mCoreCreate(mPlatform::mPLATFORM_GBA);
   m_core->init(m_core);
@@ -110,19 +111,17 @@ Core::Core(int device_number, bool threaded, u64 gc_ticks)
 
   m_core->reset(m_core);
 
-  if (m_threaded)
+  if (threaded && !Movie::IsRecordingInput() && !Movie::IsPlayingInput())
   {
     m_idle = true;
     m_exit_loop = false;
     m_thread = std::make_unique<std::thread>([this] { ThreadLoop(); });
   }
-  m_state_callback_id = ::Core::RegisterStateChangedCallback([this](auto state) { Flush(); });
 }
 
 Core::~Core()
 {
-  ::Core::UnregisterStateChangedCallback(m_state_callback_id);
-  if (m_threaded)
+  if (m_thread)
   {
     Flush();
     m_exit_loop = true;
@@ -146,7 +145,7 @@ void Core::SendJoybusCommand(u64 gc_ticks, u8* buffer, bool sync_only)
   if (buffer)
     std::copy(buffer, buffer + 5, command.buffer.begin());
 
-  if (m_threaded)
+  if (m_thread)
   {
     std::lock_guard<std::mutex> lock(m_queue_mutex);
     m_command_queue.push(command);
@@ -161,7 +160,7 @@ void Core::SendJoybusCommand(u64 gc_ticks, u8* buffer, bool sync_only)
 
 std::vector<u8> Core::GetJoybusResponse()
 {
-  if (m_threaded)
+  if (m_thread)
   {
     std::unique_lock<std::mutex> lock(m_response_mutex);
     m_response_cv.wait(lock, [&] { return m_response_ready; });
@@ -172,7 +171,7 @@ std::vector<u8> Core::GetJoybusResponse()
 
 void Core::Flush()
 {
-  if (!m_threaded)
+  if (!m_thread)
     return;
   std::unique_lock<std::mutex> lock(m_queue_mutex);
   m_response_cv.wait(lock, [&] { return m_idle; });
@@ -215,7 +214,7 @@ void Core::RunCommand(Command& command)
                 std::back_inserter(m_response));
       run_ahead = m_response.size() * SystemTimers::GetTicksPerSecond() / BYTES_PER_SECOND;
     }
-    if (m_threaded && !m_response_ready)
+    if (m_thread && !m_response_ready)
     {
       std::lock_guard<std::mutex> response_lock(m_response_mutex);
       m_response_ready = true;
@@ -292,7 +291,15 @@ u16 Core::GetPadStatus()
   if (!NetPlay::IsNetPlayRunning())
     pad_status = Pad::GetStatus(m_device_number);
 
-  SerialInterface::CSIDevice_GCController::HandleMoviePadStatus(m_device_number, &pad_status);
+  if (m_thread && (Movie::IsRecordingInput() || Movie::IsPlayingInput()))
+  {
+    PanicAlertFmtT("Warning: Movies are disabled when using multithreaded GBAs");
+    SerialInterface::CSIDevice_GCController::NetPlay_GetInput(m_device_number, &pad_status);
+  }
+  else
+  {
+    SerialInterface::CSIDevice_GCController::HandleMoviePadStatus(m_device_number, &pad_status);
+  }
 
   static constexpr std::array buttons_map = {
       PadButton::PAD_BUTTON_A,      // A
