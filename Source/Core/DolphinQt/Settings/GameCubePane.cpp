@@ -12,6 +12,7 @@
 #include <QGroupBox>
 #include <QInputDialog>
 #include <QLabel>
+#include <QLineEdit>
 #include <QPushButton>
 #include <QVBoxLayout>
 
@@ -124,8 +125,32 @@ void GameCubePane::CreateWidgets()
   device_layout->addWidget(m_slot_combos[2], 2, 1);
   device_layout->addWidget(m_slot_buttons[2], 2, 2);
 
+  // GBA Settings
+  QGroupBox* gba_box = new QGroupBox(tr("GBA Settings"), this);
+  QGridLayout* gba_layout = new QGridLayout(gba_box);
+  gba_box->setLayout(gba_layout);
+
+  m_gba_threads = new QCheckBox(tr("Run GBA Cores in Separate Threads"));
+  gba_layout->addWidget(m_gba_threads, 0, 0, 1, -1);
+
+  m_gba_bios_edit = new QLineEdit();
+  m_gba_browse_bios = new QPushButton(QStringLiteral("..."));
+  gba_layout->addWidget(new QLabel(tr("Bios:")), 1, 0);
+  gba_layout->addWidget(m_gba_bios_edit, 1, 1);
+  gba_layout->addWidget(m_gba_browse_bios, 1, 2);
+
+  m_gba_save_rom_path = new QCheckBox(tr("Save in Same Directory as the ROM"));
+  gba_layout->addWidget(m_gba_save_rom_path, 2, 0, 1, -1);
+
+  m_gba_saves_edit = new QLineEdit();
+  m_gba_browse_saves = new QPushButton(QStringLiteral("..."));
+  gba_layout->addWidget(new QLabel(tr("Saves:")), 3, 0);
+  gba_layout->addWidget(m_gba_saves_edit, 3, 1);
+  gba_layout->addWidget(m_gba_browse_saves, 3, 2);
+
   layout->addWidget(ipl_box);
   layout->addWidget(device_box);
+  layout->addWidget(gba_box);
 
   layout->addStretch();
 
@@ -148,6 +173,14 @@ void GameCubePane::ConnectWidgets()
             &GameCubePane::SaveSettings);
     connect(m_slot_buttons[i], &QPushButton::clicked, [this, i] { OnConfigPressed(i); });
   }
+
+  // GBA Settings
+  connect(m_gba_threads, &QCheckBox::stateChanged, this, &GameCubePane::SaveSettings);
+  connect(m_gba_bios_edit, &QLineEdit::editingFinished, this, &GameCubePane::SaveSettings);
+  connect(m_gba_browse_bios, &QPushButton::clicked, this, &GameCubePane::BrowseGBABios);
+  connect(m_gba_save_rom_path, &QCheckBox::stateChanged, this, &GameCubePane::SaveRomPathChanged);
+  connect(m_gba_saves_edit, &QLineEdit::editingFinished, this, &GameCubePane::SaveSettings);
+  connect(m_gba_browse_saves, &QPushButton::clicked, this, &GameCubePane::BrowseGBASaves);
 }
 
 void GameCubePane::UpdateButton(int slot)
@@ -313,6 +346,37 @@ void GameCubePane::OnConfigPressed(int slot)
   }
 }
 
+void GameCubePane::BrowseGBABios()
+{
+  QString file = QDir::toNativeSeparators(QFileDialog::getOpenFileName(
+      this, tr("Select GBA Bios"), QString::fromStdString(File::GetUserPath(F_GBABIOS_IDX)),
+      tr("All Files (*)")));
+  if (!file.isEmpty())
+  {
+    m_gba_bios_edit->setText(file);
+    SaveSettings();
+  }
+}
+
+void GameCubePane::SaveRomPathChanged()
+{
+  m_gba_saves_edit->setEnabled(!m_gba_save_rom_path->isChecked());
+  m_gba_browse_saves->setEnabled(!m_gba_save_rom_path->isChecked());
+  SaveSettings();
+}
+
+void GameCubePane::BrowseGBASaves()
+{
+  QString dir = QDir::toNativeSeparators(
+      QFileDialog::getExistingDirectory(this, tr("Select GBA Saves Path"),
+                                        QString::fromStdString(File::GetUserPath(D_GBASAVES_IDX))));
+  if (!dir.isEmpty())
+  {
+    m_gba_saves_edit->setText(dir);
+    SaveSettings();
+  }
+}
+
 void GameCubePane::LoadSettings()
 {
   const SConfig& params = SConfig::GetInstance();
@@ -347,6 +411,12 @@ void GameCubePane::LoadSettings()
         m_slot_combos[i]->findData(SConfig::GetInstance().m_EXIDevice[i]));
     UpdateButton(i);
   }
+
+  // GBA Settings
+  m_gba_threads->setChecked(Config::Get(Config::MAIN_GBA_THREADS));
+  m_gba_bios_edit->setText(QString::fromStdString(File::GetUserPath(F_GBABIOS_IDX)));
+  m_gba_save_rom_path->setChecked(Config::Get(Config::MAIN_GBA_SAVES_IN_ROM_PATH));
+  m_gba_saves_edit->setText(QString::fromStdString(File::GetUserPath(D_GBASAVES_IDX)));
 }
 
 void GameCubePane::SaveSettings()
@@ -361,6 +431,7 @@ void GameCubePane::SaveSettings()
   params.SelectedLanguage = m_language_combo->currentData().toInt();
   Config::SetBaseOrCurrent(Config::MAIN_GC_LANGUAGE, m_language_combo->currentData().toInt());
 
+  // Device Settings
   for (int i = 0; i < SLOT_COUNT; i++)
   {
     const auto dev = ExpansionInterface::TEXIDevices(m_slot_combos[i]->currentData().toInt());
@@ -390,5 +461,14 @@ void GameCubePane::SaveSettings()
       break;
     }
   }
+
+  // GBA Settings
+  Config::SetBaseOrCurrent(Config::MAIN_GBA_THREADS, m_gba_threads->isChecked());
+  Config::SetBaseOrCurrent(Config::MAIN_GBA_BIOS_PATH, m_gba_bios_edit->text().toStdString());
+  Config::SetBaseOrCurrent(Config::MAIN_GBA_SAVES_IN_ROM_PATH, m_gba_save_rom_path->isChecked());
+  Config::SetBaseOrCurrent(Config::MAIN_GBA_SAVES_PATH, m_gba_saves_edit->text().toStdString());
+  File::SetUserPath(F_GBABIOS_IDX, Config::Get(Config::MAIN_GBA_BIOS_PATH));
+  File::SetUserPath(D_GBASAVES_IDX, Config::Get(Config::MAIN_GBA_SAVES_PATH));
+
   LoadSettings();
 }

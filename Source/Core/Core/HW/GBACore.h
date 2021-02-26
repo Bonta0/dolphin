@@ -40,7 +40,7 @@ struct AVStream : mAVStream
 class Core
 {
 public:
-  Core(int device_number, bool threaded, u64 gc_ticks);
+  Core(int device_number, u64 gc_ticks);
   ~Core();
 
   void SendJoybusCommand(u64 gc_ticks, u8* buffer, bool sync_only = false);

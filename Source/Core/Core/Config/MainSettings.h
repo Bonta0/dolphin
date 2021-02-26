@@ -122,6 +122,13 @@ extern const Info<std::string> MAIN_RESOURCEPACK_PATH;
 extern const Info<std::string> MAIN_FS_PATH;
 extern const Info<std::string> MAIN_SD_PATH;
 
+// Main.GBA
+
+extern const Info<std::string> MAIN_GBA_BIOS_PATH;
+extern const Info<std::string> MAIN_GBA_SAVES_PATH;
+extern const Info<bool> MAIN_GBA_SAVES_IN_ROM_PATH;
+extern const Info<bool> MAIN_GBA_THREADS;
+
 // Main.Network
 
 extern const Info<bool> MAIN_NETWORK_SSL_DUMP_READ;

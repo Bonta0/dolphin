@@ -8,7 +8,6 @@
 #include "Common/CommonTypes.h"
 #include "Common/Logging/Log.h"
 #include "Common/Swap.h"
-#include "Core/ConfigManager.h"
 #include "Core/Core.h"
 #include "Core/CoreTiming.h"
 #include "Core/HW/GBACore.h"
@@ -56,7 +55,7 @@ static s64 GetSyncInterval()
 
 CSIDevice_GBA::CSIDevice_GBA(SIDevices device, int device_number)
     : ISIDevice(device, device_number),
-      m_core(device_number, SConfig::GetInstance().bGBAThreads, CoreTiming::GetTicks())
+      m_core(device_number, CoreTiming::GetTicks())
 {
   ++s_num_connected;
 }

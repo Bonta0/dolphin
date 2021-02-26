@@ -27,11 +27,9 @@ void CommonControllersWidget::CreateLayout()
   m_common_box = new QGroupBox(tr("Common"));
   m_common_layout = new QVBoxLayout();
   m_common_bg_input = new QCheckBox(tr("Background Input"));
-  m_common_threaded_gbas = new QCheckBox(tr("Multithreaded GBA Cores"));
   m_common_configure_controller_interface = new QPushButton(tr("Alternate Input Sources"));
 
   m_common_layout->addWidget(m_common_bg_input);
-  m_common_layout->addWidget(m_common_threaded_gbas);
   m_common_layout->addWidget(m_common_configure_controller_interface);
 
   m_common_box->setLayout(m_common_layout);
@@ -46,8 +44,6 @@ void CommonControllersWidget::CreateLayout()
 void CommonControllersWidget::ConnectWidgets()
 {
   connect(m_common_bg_input, &QCheckBox::toggled, this, &CommonControllersWidget::SaveSettings);
-  connect(m_common_threaded_gbas, &QCheckBox::toggled, this,
-          &CommonControllersWidget::SaveSettings);
   connect(m_common_configure_controller_interface, &QPushButton::clicked, this,
           &CommonControllersWidget::OnControllerInterfaceConfigure);
 }
@@ -63,12 +59,10 @@ void CommonControllersWidget::OnControllerInterfaceConfigure()
 void CommonControllersWidget::LoadSettings()
 {
   m_common_bg_input->setChecked(SConfig::GetInstance().m_BackgroundInput);
-  m_common_threaded_gbas->setChecked(SConfig::GetInstance().bGBAThreads);
 }
 
 void CommonControllersWidget::SaveSettings()
 {
   SConfig::GetInstance().m_BackgroundInput = m_common_bg_input->isChecked();
-  SConfig::GetInstance().bGBAThreads = m_common_threaded_gbas->isChecked();
   SConfig::GetInstance().SaveSettings();
 }

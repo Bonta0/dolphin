@@ -13,8 +13,10 @@
 #include "AudioCommon/AudioCommon.h"
 #include "Common/ChunkFile.h"
 #include "Common/CommonTypes.h"
+#include "Common/Config/Config.h"
 #include "Common/FileUtil.h"
 #include "common/Thread.h"
+#include "Core/Config/MainSettings.h"
 #include "Core/Core.h"
 #include "Core/HW/GBACore.h"
 #include "Core/HW/GBAPad.h"
@@ -36,7 +38,7 @@ static std::unique_ptr<FrontendInterface> CreateDummyFrontend(int device_number,
 }
 std::unique_ptr<FrontendInterface> (*s_create_frontend)(int, u32, u32) = CreateDummyFrontend;
 
-Core::Core(int device_number, bool threaded, u64 gc_ticks)
+Core::Core(int device_number, u64 gc_ticks)
     : m_device_number(device_number), m_last_gc_ticks(gc_ticks), m_gc_ticks_remainder(0),
       m_link_enabled(false)
 {
@@ -48,10 +50,16 @@ Core::Core(int device_number, bool threaded, u64 gc_ticks)
   mCoreConfigSetIntValue(&m_core->config, "useBios", 1);
   mCoreConfigSetIntValue(&m_core->config, "skipBios", 0);
 
-  // TODO: tell the user if it's missing
-  std::string bios_file = File::GetUserPath(D_GCUSER_IDX) + "gba_bios.bin";
-  VFile* vf = VFileOpen(bios_file.c_str(), O_RDONLY);
-  m_core->loadBIOS(m_core, vf, 0);
+  std::string bios_path = File::GetUserPath(F_GBABIOS_IDX);
+  VFile* vf = VFileOpen(bios_path.c_str(), O_RDONLY);
+  if (!vf)
+  {
+    PanicAlertFmtT("Error: GBA{0} failed to open the BIOS in {1}", m_device_number, bios_path);
+  }
+  else
+  {
+    m_core->loadBIOS(m_core, vf, 0);
+  }
 
   GBASIOJOYCreate(&m_sio_driver);
   GBASIOSetDriver(&static_cast<::GBA*>(m_core->board)->sio, &m_sio_driver, SIO_JOYBUS);
@@ -112,7 +120,7 @@ Core::Core(int device_number, bool threaded, u64 gc_ticks)
 
   m_core->reset(m_core);
 
-  if (threaded && !Movie::IsRecordingInput() && !Movie::IsPlayingInput())
+  if (Config::Get(Config::MAIN_GBA_THREADS) && !Movie::IsRecordingInput() && !Movie::IsPlayingInput())
   {
     m_idle = true;
     m_exit_loop = false;

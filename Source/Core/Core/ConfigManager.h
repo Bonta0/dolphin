@@ -114,7 +114,6 @@ struct SConfig
 
   int iTimingVariance = 40;  // in milli secounds
   bool bCPUThread = true;
-  bool bGBAThreads = true;
   bool bDSPThread = false;
   bool bDSPHLE = true;
   bool bSyncGPUOnSkipIdleHack = true;
