@@ -62,6 +62,12 @@ private:
   };
   void RunCommand(Command& command);
 
+  void LoadBIOS();
+  void SetSIODriver();
+  void SetCallbacks();
+  void SetAVStream();
+  void SetupEvent();
+
   void OnKeysRead();
   u16 GetPadStatus();
 

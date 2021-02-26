@@ -50,40 +50,9 @@ Core::Core(int device_number, u64 gc_ticks)
   mCoreConfigSetIntValue(&m_core->config, "useBios", 1);
   mCoreConfigSetIntValue(&m_core->config, "skipBios", 0);
 
-  std::string bios_path = File::GetUserPath(F_GBABIOS_IDX);
-  VFile* vf = VFileOpen(bios_path.c_str(), O_RDONLY);
-  if (!vf)
-  {
-    PanicAlertFmtT("Error: GBA{0} failed to open the BIOS in {1}", m_device_number, bios_path);
-  }
-  else
-  {
-    m_core->loadBIOS(m_core, vf, 0);
-  }
-
-  GBASIOJOYCreate(&m_sio_driver);
-  GBASIOSetDriver(&static_cast<::GBA*>(m_core->board)->sio, &m_sio_driver, SIO_JOYBUS);
-
-  m_sio_driver.core = this;
-  m_sio_driver.load = [](GBASIODriver* driver) {
-    static_cast<SIODriver*>(driver)->core->m_link_enabled = true;
-    return true;
-  };
-  m_sio_driver.unload = [](GBASIODriver* driver) {
-    static_cast<SIODriver*>(driver)->core->m_link_enabled = false;
-    return true;
-  };
-
-  mCoreCallbacks callbacks{};
-  callbacks.context = this;
-  callbacks.keysRead = [](void* context) {
-    reinterpret_cast<Core*>(context)->OnKeysRead();
-  };
-  callbacks.videoFrameEnded = [](void* context) {
-    auto core = reinterpret_cast<Core*>(context);
-    core->m_frontend->FrameEnded(core->m_video_buffer);
-  };
-  m_core->addCoreCallbacks(m_core, &callbacks);
+  LoadBIOS();
+  SetSIODriver();
+  SetCallbacks();
 
   u32 width, height;
   m_core->desiredVideoDimensions(m_core, &width, &height);
@@ -95,26 +64,8 @@ Core::Core(int device_number, u64 gc_ticks)
   blip_set_rates(m_core->getAudioChannel(m_core, 1), GBA_ARM7TDMI_FREQUENCY, SAMPLE_RATE);
   g_sound_stream->GetMixer()->SetGBAInputSampleRates(m_device_number, SAMPLE_RATE);
 
-  m_stream.core = this;
-  m_stream.videoDimensionsChanged = nullptr;
-  m_stream.postVideoFrame = nullptr;
-  m_stream.postAudioFrame = nullptr;
-  m_stream.postAudioBuffer = [](struct mAVStream* stream, struct blip_t* left,
-                                struct blip_t* right) {
-    auto device = static_cast<AVStream*>(stream)->core;
-    std::vector<s16> buffer(SAMPLES * 2);
-    blip_read_samples(left, &buffer[0], SAMPLES, 1);
-    blip_read_samples(right, &buffer[1], SAMPLES, 1);
-    g_sound_stream->GetMixer()->PushGBASamples(device->m_device_number, &buffer[0], SAMPLES);
-  };
-  m_core->setAVStream(m_core, &m_stream);
-
-  m_event.context = m_core->board;
-  m_event.name = "Dolphin Sync";
-  m_event.callback = [](mTiming* timing, void* context, u32 cycles_late) {
-    static_cast<::GBA*>(context)->earlyExit = true;
-  };
-  m_event.priority = 0x80;
+  SetAVStream();
+  SetupEvent();
 
   m_frontend = s_create_frontend(m_device_number, width, height);
 
@@ -144,6 +95,75 @@ Core::~Core()
   m_frontend->Stop();
   mCoreConfigDeinit(&m_core->config);
   m_core->deinit(m_core);
+}
+
+void Core::LoadBIOS()
+{
+  std::string bios_path = File::GetUserPath(F_GBABIOS_IDX);
+  VFile* vf = VFileOpen(bios_path.c_str(), O_RDONLY);
+  if (!vf)
+  {
+    PanicAlertFmtT("Error: GBA{0} failed to open the BIOS in {1}", m_device_number, bios_path);
+  }
+  else
+  {
+    m_core->loadBIOS(m_core, vf, 0);
+  }
+}
+
+void Core::SetSIODriver()
+{
+  GBASIOJOYCreate(&m_sio_driver);
+  GBASIOSetDriver(&static_cast<::GBA*>(m_core->board)->sio, &m_sio_driver, SIO_JOYBUS);
+
+  m_sio_driver.core = this;
+  m_sio_driver.load = [](GBASIODriver* driver) {
+    static_cast<SIODriver*>(driver)->core->m_link_enabled = true;
+    return true;
+  };
+  m_sio_driver.unload = [](GBASIODriver* driver) {
+    static_cast<SIODriver*>(driver)->core->m_link_enabled = false;
+    return true;
+  };
+}
+
+void Core::SetCallbacks()
+{
+  mCoreCallbacks callbacks{};
+  callbacks.context = this;
+  callbacks.keysRead = [](void* context) { reinterpret_cast<Core*>(context)->OnKeysRead(); };
+  callbacks.videoFrameEnded = [](void* context) {
+    auto core = reinterpret_cast<Core*>(context);
+    core->m_frontend->FrameEnded(core->m_video_buffer);
+  };
+  m_core->addCoreCallbacks(m_core, &callbacks);
+}
+
+void Core::SetAVStream()
+{
+  m_stream.core = this;
+  m_stream.videoDimensionsChanged = nullptr;
+  m_stream.postVideoFrame = nullptr;
+  m_stream.postAudioFrame = nullptr;
+  m_stream.postAudioBuffer = [](struct mAVStream* stream, struct blip_t* left,
+                                struct blip_t* right) {
+    auto device = static_cast<AVStream*>(stream)->core;
+    std::vector<s16> buffer(SAMPLES * 2);
+    blip_read_samples(left, &buffer[0], SAMPLES, 1);
+    blip_read_samples(right, &buffer[1], SAMPLES, 1);
+    g_sound_stream->GetMixer()->PushGBASamples(device->m_device_number, &buffer[0], SAMPLES);
+  };
+  m_core->setAVStream(m_core, &m_stream);
+}
+
+void Core::SetupEvent()
+{
+  m_event.context = m_core->board;
+  m_event.name = "Dolphin Sync";
+  m_event.callback = [](mTiming* timing, void* context, u32 cycles_late) {
+    static_cast<::GBA*>(context)->earlyExit = true;
+  };
+  m_event.priority = 0x80;
 }
 
 void Core::SendJoybusCommand(u64 gc_ticks, u8* buffer, bool sync_only)
