@@ -285,7 +285,7 @@ void Initialize()
 
 void LoadConfig()
 {
-  s_config.LoadConfig(true);
+  s_config.LoadConfig(InputConfig::InputType::GC);
   LoadLegacyConfig(s_config.GetController(0));
 }
 

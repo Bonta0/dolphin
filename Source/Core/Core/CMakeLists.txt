@@ -195,6 +195,10 @@ add_library(core
   HW/EXI/EXI.h
   HW/GBACore.cpp
   HW/GBACore.h
+  HW/GBAPad.cpp
+  HW/GBAPad.h
+  HW/GBAPadEmu.cpp
+  HW/GBAPadEmu.h
   HW/GBAFrontend.h
   HW/GCKeyboard.cpp
   HW/GCKeyboard.h

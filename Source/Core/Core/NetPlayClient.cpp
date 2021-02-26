@@ -40,6 +40,8 @@
 #include "Core/ConfigManager.h"
 #include "Core/GeckoCode.h"
 #include "Core/HW/EXI/EXI_DeviceIPL.h"
+#include "Core/HW/GBAPad.h"
+#include "Core/HW/GCPad.h"
 #include "Core/HW/SI/SI.h"
 #include "Core/HW/SI/SI_Device.h"
 #include "Core/HW/SI/SI_DeviceGCController.h"
@@ -2046,6 +2048,9 @@ bool NetPlayClient::PollLocalPad(const int local_pad, sf::Packet& packet)
   {
   case SerialInterface::SIDEVICE_WIIU_ADAPTER:
     pad_status = GCAdapter::Input(local_pad);
+    break;
+  case SerialInterface::SIDEVICE_GC_GBA:
+    pad_status = Pad::GetGBAStatus(local_pad);
     break;
   case SerialInterface::SIDEVICE_GC_CONTROLLER:
   default:

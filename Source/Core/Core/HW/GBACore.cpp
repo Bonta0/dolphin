@@ -17,6 +17,7 @@
 #include "common/Thread.h"
 #include "Core/Core.h"
 #include "Core/HW/GBACore.h"
+#include "Core/HW/GBAPad.h"
 #include "Core/HW/GBAFrontend.h"
 #include "Core/HW/SI/SI_DeviceGCController.h"
 #include "Core/HW/SystemTimers.h"
@@ -285,11 +286,10 @@ void Core::OnKeysRead()
 
 u16 Core::GetPadStatus()
 {
-  //TODO: get from own config and threadsafety
   GCPadStatus pad_status{};
 
   if (!NetPlay::IsNetPlayRunning())
-    pad_status = Pad::GetStatus(m_device_number);
+    pad_status = Pad::GetGBAStatus(m_device_number);
 
   if (m_thread && (Movie::IsRecordingInput() || Movie::IsPlayingInput()))
   {

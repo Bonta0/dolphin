@@ -26,7 +26,7 @@ InputConfig::InputConfig(const std::string& ini_name, const std::string& gui_nam
 
 InputConfig::~InputConfig() = default;
 
-bool InputConfig::LoadConfig(bool isGC)
+bool InputConfig::LoadConfig(InputType type)
 {
   IniFile inifile;
   bool useProfile[MAX_BBMOTES] = {false, false, false, false, false};
@@ -43,16 +43,19 @@ bool InputConfig::LoadConfig(bool isGC)
 
   if (SConfig::GetInstance().GetGameID() != "00000000")
   {
-    std::string type;
-    if (isGC)
+    std::string type_str;
+    switch (type)
     {
-      type = "Pad";
-      path = "Profiles/GCPad/";
-    }
-    else
-    {
-      type = "Wiimote";
+    case InputType::GBA:
+      type_str = "GBA";
+      path = "Profiles/GBA/";
+    case InputType::Wii:
+      type_str = "Wiimote";
       path = "Profiles/Wiimote/";
+    case InputType::GC:
+    default:
+      type_str = "Pad";
+      path = "Profiles/GCPad/";
     }
 
     IniFile game_ini = SConfig::GetInstance().LoadGameIni();
@@ -60,7 +63,7 @@ bool InputConfig::LoadConfig(bool isGC)
 
     for (int i = 0; i < 4; i++)
     {
-      const auto profile_name = fmt::format("{}Profile{}", type, num[i]);
+      const auto profile_name = fmt::format("{}Profile{}", type_str, num[i]);
 
       if (control_section->Exists(profile_name))
       {

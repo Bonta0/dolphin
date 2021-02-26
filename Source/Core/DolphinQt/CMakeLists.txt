@@ -122,6 +122,8 @@ add_executable(dolphin-emu
   Config/LogWidget.h
   Config/Mapping/FreeLookGeneral.cpp
   Config/Mapping/FreeLookGeneral.h
+  Config/Mapping/GBAPadEmu.cpp
+  Config/Mapping/GBAPadEmu.h
   Config/Mapping/GCKeyboardEmu.cpp
   Config/Mapping/GCKeyboardEmu.h
   Config/Mapping/GCMicrophone.cpp

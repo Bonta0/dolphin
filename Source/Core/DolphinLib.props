@@ -263,6 +263,8 @@
     <ClInclude Include="Core\HW\EXI\EXI_DeviceMic.h" />
     <ClInclude Include="Core\HW\EXI\EXI.h" />
     <ClInclude Include="Core\HW\GBACore.h" />
+    <ClInclude Include="Core\HW\GBAPad.h" />
+    <ClInclude Include="Core\HW\GBAPadEmu.h" />
     <ClInclude Include="Core\HW\GBAFrontend.h" />
     <ClInclude Include="Core\HW\GCKeyboard.h" />
     <ClInclude Include="Core\HW\GCKeyboardEmu.h" />
@@ -837,6 +839,8 @@
     <ClCompile Include="Core\HW\EXI\EXI_DeviceMic.cpp" />
     <ClCompile Include="Core\HW\EXI\EXI.cpp" />
     <ClCompile Include="Core\HW\GBACore.cpp" />
+    <ClCompile Include="Core\HW\GBAPad.cpp" />
+    <ClCompile Include="Core\HW\GBAPadEmu.cpp" />
     <ClCompile Include="Core\HW\GCKeyboard.cpp" />
     <ClCompile Include="Core\HW\GCKeyboardEmu.cpp" />
     <ClCompile Include="Core\HW\GCMemcard\GCIFile.cpp" />
