@@ -17,6 +17,7 @@ class InputConfig;
 class MappingButton;
 class MappingNumeric;
 class MappingWindow;
+class QFormLayout;
 class QPushButton;
 class QGroupBox;
 
@@ -53,6 +54,8 @@ protected:
 
   QGroupBox* CreateGroupBox(ControllerEmu::ControlGroup* group);
   QGroupBox* CreateGroupBox(const QString& name, ControllerEmu::ControlGroup* group);
+  QGroupBox* CreateControlsBox(const QString& name, ControllerEmu::ControlGroup* group, int columns);
+  void CreateControl(const ControllerEmu::Control* control, QFormLayout* layout, bool indicator);
   QPushButton* CreateSettingAdvancedMappingButton(ControllerEmu::NumericSettingBase& setting);
 
 private:
