@@ -33,10 +33,24 @@ GBAWidget::GBAWidget(int device_number, std::string title, u32 width, u32 height
   setWindowIcon(Resources::GetAppIcon());
   resize(width, height);
   show();
-  move(static_cast<int>(x() - frameGeometry().width() / (device_number & 1 ? -2.f : 2.f)),
-       static_cast<int>(y() - frameGeometry().height() / (device_number & 2 ? -2.f : 2.f)));
+
+  QSettings& settings = Settings::GetQSettings();
+  auto key = QString::fromStdString(fmt::format("gbawidget/geometry{}", m_device_number + 1));
+  if (settings.contains(key))
+    restoreGeometry(settings.value(key).toByteArray());
+  else
+    move(static_cast<int>(x() - frameGeometry().width() / (device_number & 1 ? -2.f : 2.f)),
+         static_cast<int>(y() - frameGeometry().height() / (device_number & 2 ? -2.f : 2.f)));
+
   UpdateTitle();
   UpdateVolume();
+}
+
+GBAWidget::~GBAWidget()
+{
+  QSettings& settings = Settings::GetQSettings();
+  auto key = QString::fromStdString(fmt::format("gbawidget/geometry{}", m_device_number + 1));
+  settings.setValue(key, saveGeometry());
 }
 
 void GBAWidget::SetVideoBuffer(std::vector<u32> video_buffer)

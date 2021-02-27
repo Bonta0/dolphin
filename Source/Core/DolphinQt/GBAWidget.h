@@ -16,6 +16,7 @@ class GBAWidget : public QWidget
 public:
   GBAWidget(int device_number, std::string title, u32 width, u32 height, QWidget* parent = nullptr,
             Qt::WindowFlags flags = {});
+  ~GBAWidget();
 
   void SetVideoBuffer(std::vector<u32> video_buffer);
   void UpdateTitle();
