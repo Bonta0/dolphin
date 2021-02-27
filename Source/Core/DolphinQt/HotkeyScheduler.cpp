@@ -152,10 +152,12 @@ void HotkeyScheduler::Run()
       // Obey window focus (config permitting) before checking hotkeys.
       Core::UpdateInputGate(Config::Get(Config::MAIN_FOCUSED_HOTKEYS));
 
-      HotkeyManagerEmu::GetStatus();
+      HotkeyManagerEmu::GetStatus(false);
 
       // Everything else on the host thread (controller config dialog) should always get input.
       ControlReference::SetInputGate(true);
+
+      HotkeyManagerEmu::GetStatus(true);
 
       if (!Core::IsRunningAndStarted())
         continue;
@@ -518,6 +520,19 @@ void HotkeyScheduler::Run()
           Config::SetCurrent(Config::GFX_ENHANCE_POST_SHADER, "");
         }
       }
+
+      if (IsHotkey(HK_GBA_LOAD))
+        emit GBALoad();
+      if (IsHotkey(HK_GBA_UNLOAD))
+        emit GBAUnload();
+      if (IsHotkey(HK_GBA_RESET))
+        emit GBAReset();
+      if (IsHotkey(HK_GBA_VOLUME_DOWN))
+        emit GBAVolumeDown();
+      if (IsHotkey(HK_GBA_VOLUME_UP))
+        emit GBAVolumeUp();
+      if (IsHotkey(HK_GBA_TOGGLE_MUTE))
+        emit GBAToggleMute();
     }
 
     const auto stereo_depth = Config::Get(Config::GFX_STEREO_DEPTH);

@@ -50,6 +50,13 @@ signals:
   void ToggleReadOnlyMode();
   void ConnectWiiRemote(int id);
 
+  void GBALoad();
+  void GBAUnload();
+  void GBAReset();
+  void GBAVolumeDown();
+  void GBAVolumeUp();
+  void GBAToggleMute();
+
   void Step();
   void StepOver();
   void StepOut();

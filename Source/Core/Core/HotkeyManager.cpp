@@ -24,7 +24,7 @@
 #include "InputCommon/GCPadStatus.h"
 
 // clang-format off
-constexpr std::array<const char*, 125> s_hotkey_labels{{
+constexpr std::array<const char*, NUM_HOTKEYS> s_hotkey_labels{{
     _trans("Open"),
     _trans("Change Disc"),
     _trans("Eject Disc"),
@@ -178,9 +178,15 @@ constexpr std::array<const char*, 125> s_hotkey_labels{{
     _trans("Undo Save State"),
     _trans("Save State"),
     _trans("Load State"),
+
+    _trans("Load ROM"),
+    _trans("Unload ROM"),
+    _trans("Reset"),
+    _trans("Volume Down"),
+    _trans("Volume Up"),
+    _trans("Volume Toggle Mute"),
 }};
 // clang-format on
-static_assert(NUM_HOTKEYS == s_hotkey_labels.size(), "Wrong count of hotkey_labels");
 
 namespace HotkeyManagerEmu
 {
@@ -195,10 +201,10 @@ InputConfig* GetConfig()
   return &s_config;
 }
 
-void GetStatus()
+void GetStatus(bool ignore_focus)
 {
   // Get input
-  static_cast<HotkeyManager*>(s_config.GetController(0))->GetInput(&s_hotkey);
+  static_cast<HotkeyManager*>(s_config.GetController(0))->GetInput(&s_hotkey, ignore_focus);
 }
 
 bool IsEnabled()
@@ -334,7 +340,8 @@ constexpr std::array<HotkeyGroupInfo, NUM_HOTKEY_GROUPS> s_groups_info = {
      {_trans("Save State"), HK_SAVE_STATE_SLOT_1, HK_SAVE_STATE_SLOT_SELECTED},
      {_trans("Select State"), HK_SELECT_STATE_SLOT_1, HK_SELECT_STATE_SLOT_10},
      {_trans("Load Last State"), HK_LOAD_LAST_STATE_1, HK_LOAD_LAST_STATE_10},
-     {_trans("Other State Hotkeys"), HK_SAVE_FIRST_STATE, HK_LOAD_STATE_FILE}}};
+     {_trans("Other State Hotkeys"), HK_SAVE_FIRST_STATE, HK_LOAD_STATE_FILE},
+     {_trans("GameBoy Advance"), HK_GBA_LOAD, HK_GBA_TOGGLE_MUTE}}};
 
 HotkeyManager::HotkeyManager()
 {
@@ -359,11 +366,14 @@ std::string HotkeyManager::GetName() const
   return "Hotkeys";
 }
 
-void HotkeyManager::GetInput(HotkeyStatus* const kb)
+void HotkeyManager::GetInput(HotkeyStatus* kb, bool ignore_focus)
 {
   const auto lock = GetStateLock();
   for (std::size_t group = 0; group < s_groups_info.size(); group++)
   {
+    if ((group == HotkeyGroup::HKGP_GBA) != ignore_focus)
+      continue;
+
     const int group_count = (s_groups_info[group].last - s_groups_info[group].first) + 1;
     std::vector<u32> bitmasks(group_count);
     for (size_t key = 0; key < bitmasks.size(); key++)
@@ -441,4 +451,17 @@ void HotkeyManager::LoadDefaults(const ControllerInterface& ciface)
   }
   set_key_expression(HK_UNDO_LOAD_STATE, "F12");
   set_key_expression(HK_UNDO_SAVE_STATE, hotkey_string({"Shift", "F12"}));
+
+  // GBA
+  set_key_expression(HK_GBA_LOAD, hotkey_string({"Ctrl", "O"}));
+  set_key_expression(HK_GBA_UNLOAD, hotkey_string({"Ctrl", "W"}));
+  set_key_expression(HK_GBA_RESET, hotkey_string({"Ctrl", "R"}));
+#ifdef _WIN32
+  set_key_expression(HK_GBA_VOLUME_DOWN, "ADD");
+  set_key_expression(HK_GBA_VOLUME_UP, "SUBTRACT");
+#else
+  set_key_expression(HK_GBA_VOLUME_DOWN, "KP_Add");
+  set_key_expression(HK_GBA_VOLUME_UP, "KP_Subtract");
+#endif
+  set_key_expression(HK_GBA_TOGGLE_MUTE, "M");
 }

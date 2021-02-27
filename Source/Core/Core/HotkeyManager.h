@@ -164,6 +164,13 @@ enum Hotkey
   HK_SAVE_STATE_FILE,
   HK_LOAD_STATE_FILE,
 
+  HK_GBA_LOAD,
+  HK_GBA_UNLOAD,
+  HK_GBA_RESET,
+  HK_GBA_VOLUME_DOWN,
+  HK_GBA_VOLUME_UP,
+  HK_GBA_TOGGLE_MUTE,
+
   NUM_HOTKEYS,
 };
 
@@ -192,6 +199,7 @@ enum HotkeyGroup : int
   HKGP_SELECT_STATE,
   HKGP_LOAD_LAST_STATE,
   HKGP_STATE_MISC,
+  HKGP_GBA,
 
   NUM_HOTKEY_GROUPS,
 };
@@ -208,7 +216,7 @@ public:
   HotkeyManager();
   ~HotkeyManager();
 
-  void GetInput(HotkeyStatus* const hk);
+  void GetInput(HotkeyStatus* hk, bool ignore_focus);
   std::string GetName() const override;
   ControllerEmu::ControlGroup* GetHotkeyGroup(HotkeyGroup group) const;
   int FindGroupByID(int id) const;
@@ -228,7 +236,7 @@ void LoadConfig();
 
 InputConfig* GetConfig();
 ControllerEmu::ControlGroup* GetHotkeyGroup(HotkeyGroup group);
-void GetStatus();
+void GetStatus(bool ignore_focus);
 bool IsEnabled();
 void Enable(bool enable_toggle);
 bool IsPressed(int Id, bool held);
