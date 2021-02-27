@@ -25,7 +25,7 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <PreBuildEvent>
       <Command>IF NOT EXIST "$(BuildRootDir)$(PlatformName)\mGBA" ( mkdir $(BuildRootDir)$(PlatformName)\mGBA )
-IF NOT EXIST "$(BuildRootDir)$(PlatformName)\mGBA\mgba.vcxproj" ( cmake -A $(PlatformName) -S"$(ExternalsDir)mGBA" -B"$(BuildRootDir)$(PlatformName)\mGBA" -DLIBMGBA_ONLY=ON )</Command>
+IF NOT EXIST "$(BuildRootDir)$(PlatformName)\mGBA\mgba.vcxproj" ( cmake -A $(PlatformName) -S"$(ExternalsDir)mGBA" -B"$(BuildRootDir)$(PlatformName)\mGBA" -DLIBMGBA_ONLY=ON -DUSE_LZMA=ON )</Command>
     </PreBuildEvent>
     <Lib>
       <AdditionalDependencies>$(BuildRootDir)$(PlatformName)\mGBA\$(ConfigurationName)\mgba.lib;%(AdditionalDependencies)</AdditionalDependencies>
@@ -34,7 +34,7 @@ IF NOT EXIST "$(BuildRootDir)$(PlatformName)\mGBA\mgba.vcxproj" ( cmake -A $(Pla
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <PreBuildEvent>
       <Command>IF NOT EXIST "$(BuildRootDir)$(PlatformName)\mGBA" ( mkdir $(BuildRootDir)$(PlatformName)\mGBA )
-IF NOT EXIST "$(BuildRootDir)$(PlatformName)\mGBA\mgba.vcxproj" ( cmake -A $(PlatformName) -S"$(ExternalsDir)mGBA" -B"$(BuildRootDir)$(PlatformName)\mGBA" -DLIBMGBA_ONLY=ON )</Command>
+IF NOT EXIST "$(BuildRootDir)$(PlatformName)\mGBA\mgba.vcxproj" ( cmake -A $(PlatformName) -S"$(ExternalsDir)mGBA" -B"$(BuildRootDir)$(PlatformName)\mGBA" -DLIBMGBA_ONLY=ON -DUSE_LZMA=ON )</Command>
     </PreBuildEvent>
     <Lib>
       <AdditionalDependencies>$(BuildRootDir)$(PlatformName)\mGBA\$(ConfigurationName)\mgba.lib;%(AdditionalDependencies)</AdditionalDependencies>
@@ -43,7 +43,7 @@ IF NOT EXIST "$(BuildRootDir)$(PlatformName)\mGBA\mgba.vcxproj" ( cmake -A $(Pla
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM64'">
     <PreBuildEvent>
       <Command>IF NOT EXIST "$(BuildRootDir)$(PlatformName)\mGBA" ( mkdir $(BuildRootDir)$(PlatformName)\mGBA )
-IF NOT EXIST "$(BuildRootDir)$(PlatformName)\mGBA\mgba.vcxproj" ( cmake -A $(PlatformName) -S"$(ExternalsDir)mGBA" -B"$(BuildRootDir)$(PlatformName)\mGBA" -DLIBMGBA_ONLY=ON )</Command>
+IF NOT EXIST "$(BuildRootDir)$(PlatformName)\mGBA\mgba.vcxproj" ( cmake -A $(PlatformName) -S"$(ExternalsDir)mGBA" -B"$(BuildRootDir)$(PlatformName)\mGBA" -DLIBMGBA_ONLY=ON -DUSE_LZMA=ON )</Command>
     </PreBuildEvent>
     <Lib>
       <AdditionalDependencies>$(BuildRootDir)$(PlatformName)\mGBA\$(ConfigurationName)\mgba.lib;%(AdditionalDependencies)</AdditionalDependencies>
@@ -52,7 +52,7 @@ IF NOT EXIST "$(BuildRootDir)$(PlatformName)\mGBA\mgba.vcxproj" ( cmake -A $(Pla
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|ARM64'">
     <PreBuildEvent>
       <Command>IF NOT EXIST "$(BuildRootDir)$(PlatformName)\mGBA" ( mkdir $(BuildRootDir)$(PlatformName)\mGBA )
-IF NOT EXIST "$(BuildRootDir)$(PlatformName)\mGBA\mgba.vcxproj" ( cmake -A $(PlatformName) -S"$(ExternalsDir)mGBA" -B"$(BuildRootDir)$(PlatformName)\mGBA" -DLIBMGBA_ONLY=ON )</Command>
+IF NOT EXIST "$(BuildRootDir)$(PlatformName)\mGBA\mgba.vcxproj" ( cmake -A $(PlatformName) -S"$(ExternalsDir)mGBA" -B"$(BuildRootDir)$(PlatformName)\mGBA" -DLIBMGBA_ONLY=ON -DUSE_LZMA=ON )</Command>
     </PreBuildEvent>
     <Lib>
       <AdditionalDependencies>$(BuildRootDir)$(PlatformName)\mGBA\$(ConfigurationName)\mgba.lib;%(AdditionalDependencies)</AdditionalDependencies>
