@@ -9,13 +9,16 @@
 #include <mgba/core/timing.h>
 #include <mgba/internal/gba/gba.h>
 #include <mgba-util/vfs.h>
+#include <unzip.h>
 
 #include "AudioCommon/AudioCommon.h"
 #include "Common/ChunkFile.h"
 #include "Common/CommonTypes.h"
+#include "Common/CommonPaths.h"
 #include "Common/Config/Config.h"
 #include "Common/FileUtil.h"
-#include "common/Thread.h"
+#include "Common/MinizipUtil.h"
+#include "Common/Thread.h"
 #include "Core/Config/MainSettings.h"
 #include "Core/Core.h"
 #include "Core/HW/GBACore.h"
@@ -31,17 +34,18 @@ namespace HW::GBA
 constexpr auto SAMPLES = 512;
 constexpr auto SAMPLE_RATE = 48000;
 
-static std::unique_ptr<FrontendInterface> CreateDummyFrontend(int device_number, u32 width,
-                                                              u32 height)
+static std::unique_ptr<FrontendInterface> CreateDummyFrontend(int, const char*, u32, u32)
 {
   return std::make_unique<FrontendInterface>();
 }
-std::unique_ptr<FrontendInterface> (*s_create_frontend)(int, u32, u32) = CreateDummyFrontend;
+std::unique_ptr<FrontendInterface> (*s_create_frontend)(int, const char*, u32, u32) = CreateDummyFrontend;
 
 Core::Core(int device_number, u64 gc_ticks)
     : m_device_number(device_number), m_last_gc_ticks(gc_ticks), m_gc_ticks_remainder(0),
       m_link_enabled(false)
 {
+  m_rom_path = Pad::GetGBARomPath(m_device_number);
+
   m_core = mCoreCreate(mPlatform::mPLATFORM_GBA);
   m_core->init(m_core);
 
@@ -51,6 +55,7 @@ Core::Core(int device_number, u64 gc_ticks)
   mCoreConfigSetIntValue(&m_core->config, "skipBios", 0);
 
   LoadBIOS();
+  LoadROM();
   SetSIODriver();
   SetCallbacks();
 
@@ -67,7 +72,9 @@ Core::Core(int device_number, u64 gc_ticks)
   SetAVStream();
   SetupEvent();
 
-  m_frontend = s_create_frontend(m_device_number, width, height);
+  std::string game_title(256, '\0');
+  m_core->getGameTitle(m_core, game_title.data());
+  m_frontend = s_create_frontend(m_device_number, game_title.data(), width, height);
 
   m_core->reset(m_core);
 
@@ -103,11 +110,140 @@ void Core::LoadBIOS()
   VFile* vf = VFileOpen(bios_path.c_str(), O_RDONLY);
   if (!vf)
   {
-    PanicAlertFmtT("Error: GBA{0} failed to open the BIOS in {1}", m_device_number, bios_path);
+    PanicAlertFmtT("Error: GBA{0} failed to open the BIOS in {1}", m_device_number + 1, bios_path);
+    return;
   }
-  else
+
+  if (!m_core->loadBIOS(m_core, vf, 0))
   {
-    m_core->loadBIOS(m_core, vf, 0);
+    PanicAlertFmtT("Error: GBA{0} failed to load the BIOS in {1}", m_device_number + 1, bios_path);
+    vf->close(vf);
+    return;
+  }
+}
+
+static VFile* LoadROM_Archive(const char* path)
+{
+  VFile* vf{};
+  VDir* archive = VDirOpenArchive(path);
+  if (archive)
+  {
+    VFile* vf_archive =
+        VDirFindFirst(archive, [](VFile* vf) { return mCoreIsCompatible(vf) == mPLATFORM_GBA; });
+    if (vf_archive)
+    {
+      size_t size = static_cast<size_t>(vf_archive->size(vf_archive));
+
+      std::vector<u8> buffer(size);
+      vf_archive->seek(vf_archive, 0, SEEK_SET);
+      vf_archive->read(vf_archive, buffer.data(), size);
+      vf_archive->close(vf_archive);
+
+      vf = VFileMemChunk(buffer.data(), size);
+    }
+    archive->close(archive);
+  }
+  return vf;
+}
+
+static VFile* LoadROM_Zip(const char* path)
+{
+  VFile* vf{};
+  unzFile zip = unzOpen(path);
+  if (zip)
+  {
+    do
+    {
+      unz_file_info info{};
+      if (unzGetCurrentFileInfo(zip, &info, nullptr, 0, nullptr, 0, nullptr, 0) != UNZ_OK ||
+          !info.uncompressed_size)
+        continue;
+
+      std::vector<u8> buffer(info.uncompressed_size);
+      if (!Common::ReadFileFromZip(zip, &buffer))
+        continue;
+
+      vf = VFileMemChunk(buffer.data(), info.uncompressed_size);
+      if (mCoreIsCompatible(vf) == mPLATFORM_GBA)
+      {
+        vf->seek(vf, 0, SEEK_SET);
+        break;
+      }
+
+      vf->close(vf);
+      vf = nullptr;
+    } while (unzGoToNextFile(zip) == UNZ_OK);
+    unzClose(zip);
+  }
+  return vf;
+}
+
+void Core::LoadROM()
+{
+  if (m_rom_path.empty())
+    return;
+
+  VFile* vf{};
+
+  vf = LoadROM_Archive(m_rom_path.c_str());
+  if (!vf)
+    vf = LoadROM_Zip(m_rom_path.c_str());
+  if (!vf)
+  {
+    vf = VFileOpen(m_rom_path.c_str(), O_RDONLY);
+    if (vf)
+    {
+      if (mCoreIsCompatible(vf) != mPLATFORM_GBA)
+      {
+        vf->close(vf);
+        vf = nullptr;
+      }
+      else
+      {
+        vf->seek(vf, 0, SEEK_SET);
+      }
+    }
+  }
+
+  if (!vf)
+  {
+    PanicAlertFmtT("Error: GBA{0} failed to open the ROM in {1}", m_device_number + 1, m_rom_path);
+    return;
+  }
+
+  if (!m_core->loadROM(m_core, vf))
+  {
+    PanicAlertFmtT("Error: GBA{0} failed to load the ROM in {1}", m_device_number + 1, m_rom_path);
+    vf->close(vf);
+    return;
+  }
+
+  LoadSave();
+}
+
+void Core::LoadSave()
+{
+  std::string save_path = fmt::format(
+      "{}_{}.sav", m_rom_path.substr(0, m_rom_path.find_last_of('.')), m_device_number + 1);
+
+  if (!Config::Get(Config::MAIN_GBA_SAVES_IN_ROM_PATH))
+  {
+    save_path =
+        File::GetUserPath(D_GBASAVES_IDX) + save_path.substr(save_path.find_last_of("\\/") + 1);
+  }
+
+  VFile* vf = VFileOpen(save_path.c_str(), O_CREAT | O_RDWR);
+  if (!vf)
+  {
+    PanicAlertFmtT("Error: GBA{0} failed to open the save in {1}", m_device_number + 1, save_path);
+    return;
+  }
+
+  if (!m_core->loadSave(m_core, vf))
+  {
+    PanicAlertFmtT("Error: GBA{0} failed to load the save in {1}", m_device_number + 1, save_path);
+    vf->close(vf);
+    return;
   }
 }
 

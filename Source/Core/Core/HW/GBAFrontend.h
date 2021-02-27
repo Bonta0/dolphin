@@ -23,6 +23,6 @@ public:
   virtual void Stop(){};
 };
 
-extern std::unique_ptr<FrontendInterface> (*s_create_frontend)(int device_number, u32 width,
-                                                               u32 height);
+extern std::unique_ptr<FrontendInterface> (*s_create_frontend)(int device_number, const char* title,
+                                                               u32 width, u32 height);
 }  // namespace HW::GBA

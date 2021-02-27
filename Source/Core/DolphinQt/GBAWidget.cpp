@@ -20,9 +20,9 @@
 #include "DolphinQt/Resources.h"
 #include "DolphinQt/Settings.h"
 
-GBAWidget::GBAWidget(int device_number, u32 width, u32 height, QWidget* parent,
+GBAWidget::GBAWidget(int device_number, std::string title, u32 width, u32 height, QWidget* parent,
                      Qt::WindowFlags flags)
-    : QWidget(parent, flags), m_device_number(device_number), m_width(width), m_height(height),
+    : QWidget(parent, flags), m_device_number(device_number), m_title(title), m_width(width), m_height(height),
       m_volume(100), m_muted(false)
 {
   if (NetPlay::IsNetPlayRunning())
@@ -47,7 +47,7 @@ void GBAWidget::SetVideoBuffer(std::vector<u32> video_buffer)
 
 void GBAWidget::UpdateTitle()
 {
-  std::string title = fmt::format("GBA{} {}", m_device_number + 1,
+  std::string title = fmt::format("GBA{} {} {}", m_device_number + 1, m_title,
                                   m_muted ? "Muted" : fmt::format("Volume {}%", m_volume));
   setWindowTitle(QString::fromStdString(title));
 }
@@ -137,12 +137,13 @@ void GBAWidget::paintEvent(QPaintEvent* event)
 class GBAFrontend : public HW::GBA::FrontendInterface
 {
 public:
-  GBAFrontend(int device_number, u32 width, u32 height, QWidget* parent = nullptr,
-              Qt::WindowFlags flags = {})
+  GBAFrontend(int device_number, const char* title, u32 width, u32 height,
+              QWidget* parent = nullptr, Qt::WindowFlags flags = {})
   {
+    std::string game_title(title);
     m_widget = std::make_shared<GBAWidget*>();
     QMetaObject::invokeMethod(qApp, [=, widget{m_widget}] {
-      *widget = new GBAWidget(device_number, width, height, parent, flags);
+      *widget = new GBAWidget(device_number, game_title, width, height, parent, flags);
     });
   }
 
@@ -164,10 +165,10 @@ private:
   std::shared_ptr<GBAWidget*> m_widget;
 };
 
-static std::unique_ptr<HW::GBA::FrontendInterface> CreateGBAFrontend(int device_number, u32 width,
-                                                              u32 height)
+static std::unique_ptr<HW::GBA::FrontendInterface>
+CreateGBAFrontend(int device_number, const char* title, u32 width, u32 height)
 {
-  return std::make_unique<GBAFrontend>(device_number, width, height);
+  return std::make_unique<GBAFrontend>(device_number, title, width, height);
 }
 
 void EnableGBAFrontend()

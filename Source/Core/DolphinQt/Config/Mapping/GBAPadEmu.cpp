@@ -59,9 +59,9 @@ void GBAPadEmu::RomChanged()
 
 void GBAPadEmu::BrowseRom()
 {
-  QString rom_file = QDir::toNativeSeparators(
-      QFileDialog::getOpenFileName(this, tr("Select the ROM File"), QString(),
-                                   tr("Game Boy Advance ROMs (*.gba *.agb *.mb *.rom *.bin)")));
+  QString rom_file = QDir::toNativeSeparators(QFileDialog::getOpenFileName(
+      this, tr("Select the ROM File"), QString::fromStdString(Pad::GetGBARomPath(GetPort())),
+      tr("Game Boy Advance ROMs (*.gba *.7z *.zip *.agb *.mb *.rom *.bin)")));
 
   if (rom_file.isEmpty())
     return;

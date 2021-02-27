@@ -9,6 +9,7 @@
 #include <memory>
 #include <mutex>
 #include <queue>
+#include <string>
 #include <thread>
 #include <vector>
 
@@ -63,6 +64,8 @@ private:
   void RunCommand(Command& command);
 
   void LoadBIOS();
+  void LoadROM();
+  void LoadSave();
   void SetSIODriver();
   void SetCallbacks();
   void SetAVStream();
@@ -72,6 +75,7 @@ private:
   u16 GetPadStatus();
 
   int m_device_number;
+  std::string m_rom_path;
 
   mCore* m_core{};
   mTimingEvent m_event{};
