@@ -29,7 +29,8 @@ private:
 
   std::vector<u32> m_video_buffer;
   int m_device_number;
-  std::string m_title;
+  std::string m_netplayer_name;
+  std::string m_game_title;
   u32 m_width;
   u32 m_height;
   int m_volume;

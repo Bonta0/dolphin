@@ -22,13 +22,19 @@
 
 GBAWidget::GBAWidget(int device_number, std::string title, u32 width, u32 height, QWidget* parent,
                      Qt::WindowFlags flags)
-    : QWidget(parent, flags), m_device_number(device_number), m_title(title), m_width(width), m_height(height),
-      m_volume(100), m_muted(false)
+    : QWidget(parent, flags), m_device_number(device_number), m_game_title(title), m_width(width),
+      m_height(height), m_volume(100), m_muted(false)
 {
   if (NetPlay::IsNetPlayRunning())
   {
     auto client = Settings::Instance().GetNetPlayClient();
-    m_muted = !client->IsLocalPlayer(client->GetPadMapping()[device_number]);
+    auto pid = client->GetPadMapping()[device_number];
+    for (const auto& player : client->GetPlayers())
+    {
+      if (player->pid == pid)
+        m_netplayer_name = player->name;
+    }
+    m_muted = !client->IsLocalPlayer(pid);
   }
   setWindowIcon(Resources::GetAppIcon());
   resize(width, height);
@@ -61,8 +67,17 @@ void GBAWidget::SetVideoBuffer(std::vector<u32> video_buffer)
 
 void GBAWidget::UpdateTitle()
 {
-  std::string title = fmt::format("GBA{} {} {}", m_device_number + 1, m_title,
-                                  m_muted ? "Muted" : fmt::format("Volume {}%", m_volume));
+  std::string title = fmt::format("GBA{}", m_device_number + 1);
+  if (!m_netplayer_name.empty())
+    title += " " + m_netplayer_name;
+
+  title += " | " + m_game_title;
+
+  if (m_muted)
+    title += " | Muted";
+  else
+    title += fmt::format(" | Volume {}%", m_volume);
+
   setWindowTitle(QString::fromStdString(title));
 }
 
