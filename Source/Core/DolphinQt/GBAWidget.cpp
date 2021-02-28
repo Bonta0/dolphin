@@ -2,40 +2,37 @@
 // Licensed under GPLv2+
 // Refer to the license.txt file included.
 
+#include <algorithm>
 #include <memory>
 
 #include <fmt/format.h>
 
+#include <QAction>
 #include <QApplication>
 #include <QCloseEvent>
+#include <QContextMenuEvent>
+#include <QFileDialog>
 #include <QIcon>
 #include <QImage>
-#include <QKeyEvent>
+#include <QMenu>
 #include <QPainter>
 
 #include "AudioCommon/AudioCommon.h"
+#include "Core/Core.h"
 #include "Core/HW/GBAFrontend.h"
+#include "Core/HW/GBAPad.h"
+#include "Core/HW/SI/SI.h"
+#include "Core/Movie.h"
 #include "Core/NetPlayClient.h"
 #include "DolphinQt/GBAWidget.h"
 #include "DolphinQt/Resources.h"
 #include "DolphinQt/Settings.h"
 
-GBAWidget::GBAWidget(int device_number, std::string title, u32 width, u32 height, QWidget* parent,
-                     Qt::WindowFlags flags)
-    : QWidget(parent, flags), m_device_number(device_number), m_game_title(title), m_width(width),
-      m_height(height), m_volume(100), m_muted(false)
+GBAWidget::GBAWidget(int device_number, std::string_view current_rom, std::string_view title,
+                     u32 width, u32 height, QWidget* parent, Qt::WindowFlags flags)
+    : QWidget(parent, flags), m_device_number(device_number), m_current_rom(current_rom),
+      m_game_title(title), m_width(width), m_height(height), m_volume(0), m_muted(false)
 {
-  if (NetPlay::IsNetPlayRunning())
-  {
-    auto client = Settings::Instance().GetNetPlayClient();
-    auto pid = client->GetPadMapping()[device_number];
-    for (const auto& player : client->GetPlayers())
-    {
-      if (player->pid == pid)
-        m_netplayer_name = player->name;
-    }
-    m_muted = !client->IsLocalPlayer(pid);
-  }
   setWindowIcon(Resources::GetAppIcon());
   resize(width, height);
   show();
@@ -48,8 +45,22 @@ GBAWidget::GBAWidget(int device_number, std::string title, u32 width, u32 height
     move(static_cast<int>(x() - frameGeometry().width() / (device_number & 1 ? -2.f : 2.f)),
          static_cast<int>(y() - frameGeometry().height() / (device_number & 2 ? -2.f : 2.f)));
 
+  SetVolume(100);
+
+  if (NetPlay::IsNetPlayRunning())
+  {
+    auto client = Settings::Instance().GetNetPlayClient();
+    auto pid = client->GetPadMapping()[device_number];
+    for (const auto& player : client->GetPlayers())
+    {
+      if (player->pid == pid)
+        m_netplayer_name = player->name;
+    }
+    if (!client->IsLocalPlayer(pid) && !IsMuted())
+      ToggleMute();
+  }
+
   UpdateTitle();
-  UpdateVolume();
 }
 
 GBAWidget::~GBAWidget()
@@ -81,10 +92,92 @@ void GBAWidget::UpdateTitle()
   setWindowTitle(QString::fromStdString(title));
 }
 
-void GBAWidget::UpdateVolume()
+void GBAWidget::SetVolume(int volume)
 {
-  unsigned int volume = static_cast<unsigned int>(m_muted ? 0 : m_volume * 256 / 100);
-  g_sound_stream->GetMixer()->SetGBAVolume(m_device_number, volume, volume);
+  m_muted = false;
+  m_volume = std::clamp(volume, 0, 100);
+
+  g_sound_stream->GetMixer()->SetGBAVolume(m_device_number, m_volume * 256 / 100,
+                                           m_volume * 256 / 100);
+
+  UpdateTitle();
+}
+
+void GBAWidget::VolumeDown()
+{
+  SetVolume(m_volume - 10);
+}
+
+void GBAWidget::VolumeUp()
+{
+  SetVolume(m_volume + 10);
+}
+
+bool GBAWidget::IsMuted()
+{
+  return m_muted;
+}
+
+void GBAWidget::ToggleMute()
+{
+  m_muted = !m_muted;
+
+  g_sound_stream->GetMixer()->SetGBAVolume(m_device_number, 0, 0);
+
+  UpdateTitle();
+}
+
+void GBAWidget::LoadROM()
+{
+  if (!CanResetCore())
+    return;
+
+  QString rom_file = QDir::toNativeSeparators(QFileDialog::getOpenFileName(
+      this, tr("Select the ROM File"),
+      QString::fromStdString(!m_current_rom.empty() ? m_current_rom :
+                                                      Pad::GetGBARomPath(m_device_number)),
+      tr("Game Boy Advance ROMs (*.gba *.7z *.zip *.agb *.mb *.rom *.bin)")));
+
+  if (!rom_file.isEmpty())
+    SendReset(rom_file.toStdString());
+}
+
+void GBAWidget::UnloadROM()
+{
+  if (m_current_rom.empty())
+    return;
+
+  SendReset("");
+}
+
+void GBAWidget::ResetCore()
+{
+  SendReset(m_current_rom);
+}
+
+void GBAWidget::Resize(int scale)
+{
+  resize(m_width * scale, m_height * scale);
+}
+
+bool GBAWidget::CanResetCore()
+{
+  return !Movie::IsPlayingInput() && !Movie::IsRecordingInput() && !NetPlay::IsNetPlayRunning();
+}
+
+void GBAWidget::SendReset(std::string_view rom_path)
+{
+  if (!CanResetCore())
+    return;
+
+  Core::RunOnCPUThread(
+      [device_number = m_device_number, rom_path{std::string(rom_path)}] {
+        std::string rom_backup = Pad::GetGBARomPath(device_number);
+        Pad::SetGBARomPath(device_number, rom_path);
+        SerialInterface::ResetGBACore(device_number);
+        Pad::SetGBARomPath(device_number, rom_backup);
+      },
+      false);
 }
 
 void GBAWidget::closeEvent(QCloseEvent* event)
@@ -92,40 +185,54 @@ void GBAWidget::closeEvent(QCloseEvent* event)
   event->ignore();
 }
 
-// TODO: proper config and connections
-void GBAWidget::keyPressEvent(QKeyEvent* event)
+void GBAWidget::contextMenuEvent(QContextMenuEvent* event)
 {
-  int scale = 0;
-  if (event->key() == Qt::Key_1)
-    scale = 1;
-  if (event->key() == Qt::Key_2)
-    scale = 2;
-  if (event->key() == Qt::Key_3)
-    scale = 3;
-  if (event->key() == Qt::Key_4)
-    scale = 4;
-  if (scale && event->modifiers() & Qt::KeyboardModifier::KeypadModifier)
-    resize(m_width * scale, m_height * scale);
+  QMenu* menu = new QMenu(this);
+  connect(menu, &QMenu::triggered, menu, &QMenu::deleteLater);
 
-  if (event->key() == Qt::Key_M)
-  {
-    m_muted = !m_muted;
-    UpdateVolume();
-    UpdateTitle();
-  }
+  QAction* load_action = new QAction(tr("L&oad ROM"), menu);
+  load_action->setEnabled(CanResetCore());
+  connect(load_action, &QAction::triggered, this, &GBAWidget::LoadROM);
 
-  int volume_change = 0;
-  if (event->key() == Qt::Key_Plus && event->modifiers() & Qt::KeyboardModifier::KeypadModifier)
-    volume_change = 2;
-  if (event->key() == Qt::Key_Minus && event->modifiers() & Qt::KeyboardModifier::KeypadModifier)
-    volume_change = -2;
-  if (volume_change)
-  {
-    m_muted = false;
-    m_volume = std::clamp(m_volume + volume_change, 0, 100);
-    UpdateVolume();
-    UpdateTitle();
-  }
+  QAction* unload_action = new QAction(tr("&Unload ROM"), menu);
+  unload_action->setEnabled(CanResetCore() && !m_current_rom.empty());
+  connect(unload_action, &QAction::triggered, this, &GBAWidget::UnloadROM);
+
+  QAction* reset_action = new QAction(tr("&Reset"), menu);
+  reset_action->setEnabled(CanResetCore());
+  connect(reset_action, &QAction::triggered, this, &GBAWidget::ResetCore);
+
+  QAction* mute_action = new QAction(tr("&Mute"), menu);
+  mute_action->setCheckable(true);
+  mute_action->setChecked(m_muted);
+  connect(mute_action, &QAction::triggered, this, &GBAWidget::ToggleMute);
+
+  QMenu* size_menu = new QMenu(tr("Window Size"), menu);
+
+  QAction* x1_action = new QAction(tr("&1x"), size_menu);
+  connect(x1_action, &QAction::triggered, this, [this] { Resize(1); });
+  QAction* x2_action = new QAction(tr("&2x"), size_menu);
+  connect(x2_action, &QAction::triggered, this, [this] { Resize(2); });
+  QAction* x3_action = new QAction(tr("&3x"), size_menu);
+  connect(x3_action, &QAction::triggered, this, [this] { Resize(3); });
+  QAction* x4_action = new QAction(tr("&4x"), size_menu);
+  connect(x4_action, &QAction::triggered, this, [this] { Resize(4); });
+
+  size_menu->addAction(x1_action);
+  size_menu->addAction(x2_action);
+  size_menu->addAction(x3_action);
+  size_menu->addAction(x4_action);
+
+  menu->addAction(load_action);
+  menu->addAction(unload_action);
+  menu->addAction(reset_action);
+  menu->addSeparator();
+  menu->addAction(mute_action);
+  menu->addSeparator();
+  menu->addMenu(size_menu);
+
+  menu->move(event->globalPos());
+  menu->show();
 }
 
 void GBAWidget::paintEvent(QPaintEvent* event)
@@ -169,10 +276,11 @@ public:
   GBAFrontend(int device_number, const char* title, u32 width, u32 height,
               QWidget* parent = nullptr, Qt::WindowFlags flags = {})
   {
-    std::string game_title(title);
     m_widget = std::make_shared<GBAWidget*>();
-    QMetaObject::invokeMethod(qApp, [=, widget{m_widget}] {
-      *widget = new GBAWidget(device_number, game_title, width, height, parent, flags);
+    QMetaObject::invokeMethod(qApp, [=, widget{m_widget},
+                                     current_rom{Pad::GetGBARomPath(device_number)},
+                                     game_title{std::string(title)}] {
+      *widget = new GBAWidget(device_number, current_rom, game_title, width, height, parent, flags);
     });
   }
 
@@ -194,13 +302,10 @@ private:
   std::shared_ptr<GBAWidget*> m_widget;
 };
 
-static std::unique_ptr<HW::GBA::FrontendInterface>
-CreateGBAFrontend(int device_number, const char* title, u32 width, u32 height)
-{
-  return std::make_unique<GBAFrontend>(device_number, title, width, height);
-}
-
 void EnableGBAFrontend()
 {
-  HW::GBA::s_create_frontend = CreateGBAFrontend;
+  HW::GBA::SetFrontendFactory([](int device_number, const char* title, u32 width,
+                                 u32 height) -> std::unique_ptr<HW::GBA::FrontendInterface> {
+    return std::make_unique<GBAFrontend>(device_number, title, width, height);
+  });
 }

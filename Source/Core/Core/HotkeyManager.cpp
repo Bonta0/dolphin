@@ -182,9 +182,15 @@ constexpr std::array<const char*, NUM_HOTKEYS> s_hotkey_labels{{
     _trans("Load ROM"),
     _trans("Unload ROM"),
     _trans("Reset"),
+
     _trans("Volume Down"),
     _trans("Volume Up"),
     _trans("Volume Toggle Mute"),
+      
+    _trans("1x"),
+    _trans("2x"),
+    _trans("3x"),
+    _trans("4x"),
 }};
 // clang-format on
 
@@ -313,6 +319,7 @@ struct HotkeyGroupInfo
   const char* name;
   Hotkey first;
   Hotkey last;
+  bool ignore_focus = false;
 };
 
 constexpr std::array<HotkeyGroupInfo, NUM_HOTKEY_GROUPS> s_groups_info = {
@@ -341,7 +348,9 @@ constexpr std::array<HotkeyGroupInfo, NUM_HOTKEY_GROUPS> s_groups_info = {
      {_trans("Select State"), HK_SELECT_STATE_SLOT_1, HK_SELECT_STATE_SLOT_10},
      {_trans("Load Last State"), HK_LOAD_LAST_STATE_1, HK_LOAD_LAST_STATE_10},
      {_trans("Other State Hotkeys"), HK_SAVE_FIRST_STATE, HK_LOAD_STATE_FILE},
-     {_trans("GameBoy Advance"), HK_GBA_LOAD, HK_GBA_TOGGLE_MUTE}}};
+     {_trans("GBA Core"), HK_GBA_LOAD, HK_GBA_RESET, true},
+     {_trans("GBA Volume"), HK_GBA_VOLUME_DOWN, HK_GBA_TOGGLE_MUTE, true},
+     {_trans("GBA Window Size"), HK_GBA_1X, HK_GBA_4X, true}}};
 
 HotkeyManager::HotkeyManager()
 {
@@ -371,7 +380,7 @@ void HotkeyManager::GetInput(HotkeyStatus* kb, bool ignore_focus)
   const auto lock = GetStateLock();
   for (std::size_t group = 0; group < s_groups_info.size(); group++)
   {
-    if ((group == HotkeyGroup::HKGP_GBA) != ignore_focus)
+    if (s_groups_info[group].ignore_focus != ignore_focus)
       continue;
 
     const int group_count = (s_groups_info[group].last - s_groups_info[group].first) + 1;
@@ -456,12 +465,25 @@ void HotkeyManager::LoadDefaults(const ControllerInterface& ciface)
   set_key_expression(HK_GBA_LOAD, hotkey_string({"Ctrl", "O"}));
   set_key_expression(HK_GBA_UNLOAD, hotkey_string({"Ctrl", "W"}));
   set_key_expression(HK_GBA_RESET, hotkey_string({"Ctrl", "R"}));
+
 #ifdef _WIN32
-  set_key_expression(HK_GBA_VOLUME_DOWN, "ADD");
-  set_key_expression(HK_GBA_VOLUME_UP, "SUBTRACT");
+  set_key_expression(HK_GBA_VOLUME_DOWN, "SUBTRACT");
+  set_key_expression(HK_GBA_VOLUME_UP, "ADD");
 #else
-  set_key_expression(HK_GBA_VOLUME_DOWN, "KP_Add");
-  set_key_expression(HK_GBA_VOLUME_UP, "KP_Subtract");
+  set_key_expression(HK_GBA_VOLUME_DOWN, "KP_Subtract");
+  set_key_expression(HK_GBA_VOLUME_UP, "KP_Add");
 #endif
   set_key_expression(HK_GBA_TOGGLE_MUTE, "M");
+
+#ifdef _WIN32
+  set_key_expression(HK_GBA_1X, "NUMPAD1");
+  set_key_expression(HK_GBA_2X, "NUMPAD2");
+  set_key_expression(HK_GBA_3X, "NUMPAD3");
+  set_key_expression(HK_GBA_4X, "NUMPAD4");
+#else
+  set_key_expression(HK_GBA_1X, "KP_1");
+  set_key_expression(HK_GBA_2X, "KP_2");
+  set_key_expression(HK_GBA_3X, "KP_3");
+  set_key_expression(HK_GBA_4X, "KP_4");
+#endif
 }

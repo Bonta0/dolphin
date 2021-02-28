@@ -21,6 +21,7 @@
 #include "Core/HW/MMIO.h"
 #include "Core/HW/ProcessorInterface.h"
 #include "Core/HW/SI/SI_Device.h"
+#include "Core/HW/SI/SI_DeviceGBA.h"
 #include "Core/HW/SystemTimers.h"
 #include "Core/Movie.h"
 #include "Core/NetPlayProto.h"
@@ -610,6 +611,12 @@ void RegisterMMIO(MMIO::Mapping* mmio, u32 base)
                  MMIO::DirectWrite<u32>(&s_exi_clock_count.hex));
 }
 
+void ResetGBACore(int device_number)
+{
+  if (GetDeviceType(device_number) == SIDevices::SIDEVICE_GC_GBA)
+    static_cast<CSIDevice_GBA*>(s_channel[device_number].device.get())->ResetCore();
+}
+
 void RemoveDevice(int device_number)
 {
   s_channel.at(device_number).device.reset();
@@ -701,7 +708,7 @@ void UpdateDevices()
 
 SIDevices GetDeviceType(int channel)
 {
-  if (channel < 0 || channel > 3)
+  if (channel < 0 || channel >= MAX_SI_CHANNELS || !s_channel[channel].device)
     return SIDEVICE_NONE;
 
   return s_channel[channel].device->GetDeviceType();

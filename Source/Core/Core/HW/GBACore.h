@@ -44,7 +44,7 @@ public:
   Core(int device_number, u64 gc_ticks);
   ~Core();
 
-  void SendJoybusCommand(u64 gc_ticks, u8* buffer, bool sync_only = false);
+  void SendJoybusCommand(u64 gc_ticks, u8* buffer);
   std::vector<u8> GetJoybusResponse();
 
   void DoState(PointerWrap& p);

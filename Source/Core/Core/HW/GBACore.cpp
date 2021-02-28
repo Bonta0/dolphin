@@ -34,11 +34,14 @@ namespace HW::GBA
 constexpr auto SAMPLES = 512;
 constexpr auto SAMPLE_RATE = 48000;
 
-static std::unique_ptr<FrontendInterface> CreateDummyFrontend(int, const char*, u32, u32)
-{
+static FrontendFactory s_frontend_factory = [](int, const char*, u32, u32) {
   return std::make_unique<FrontendInterface>();
+};
+
+void SetFrontendFactory(FrontendFactory factory)
+{
+  s_frontend_factory = factory;
 }
-std::unique_ptr<FrontendInterface> (*s_create_frontend)(int, const char*, u32, u32) = CreateDummyFrontend;
 
 Core::Core(int device_number, u64 gc_ticks)
     : m_device_number(device_number), m_last_gc_ticks(gc_ticks), m_gc_ticks_remainder(0),
@@ -74,7 +77,7 @@ Core::Core(int device_number, u64 gc_ticks)
 
   std::string game_title(256, '\0');
   m_core->getGameTitle(m_core, game_title.data());
-  m_frontend = s_create_frontend(m_device_number, game_title.data(), width, height);
+  m_frontend = s_frontend_factory(m_device_number, game_title.data(), width, height);
 
   m_core->reset(m_core);
 
@@ -302,11 +305,11 @@ void Core::SetupEvent()
   m_event.priority = 0x80;
 }
 
-void Core::SendJoybusCommand(u64 gc_ticks, u8* buffer, bool sync_only)
+void Core::SendJoybusCommand(u64 gc_ticks, u8* buffer)
 {
   Command command{};
   command.ticks = gc_ticks;
-  command.sync_only = sync_only;
+  command.sync_only = buffer == nullptr;
   if (buffer)
     std::copy(buffer, buffer + 5, command.buffer.begin());
 

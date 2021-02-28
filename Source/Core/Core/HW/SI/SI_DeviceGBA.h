@@ -4,6 +4,8 @@
 
 #pragma once
 
+#include <memory>
+
 #include "Common/CommonTypes.h"
 #include "Core/HW/GBACore.h"
 #include "Core/HW/SI/SI_Device.h"
@@ -17,6 +19,8 @@ class CSIDevice_GBA : public ISIDevice
 public:
   CSIDevice_GBA(SIDevices device, int device_number);
   ~CSIDevice_GBA();
+
+  void ResetCore();
 
   int RunBuffer(u8* buffer, int request_length) override;
   int TransferInterval() override;
@@ -38,6 +42,6 @@ private:
   u8 m_last_cmd{};
   u64 m_timestamp_sent{};
 
-  HW::GBA::Core m_core;
+  std::unique_ptr<HW::GBA::Core> m_core;
 };
 }  // namespace SerialInterface

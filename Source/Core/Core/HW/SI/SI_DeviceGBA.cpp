@@ -53,10 +53,9 @@ static s64 GetSyncInterval()
   return SystemTimers::GetTicksPerSecond() / 1000;
 }
 
-CSIDevice_GBA::CSIDevice_GBA(SIDevices device, int device_number)
-    : ISIDevice(device, device_number),
-      m_core(device_number, CoreTiming::GetTicks())
+CSIDevice_GBA::CSIDevice_GBA(SIDevices device, int device_number) : ISIDevice(device, device_number)
 {
+  ResetCore();
   ++s_num_connected;
 }
 
@@ -64,6 +63,12 @@ CSIDevice_GBA::~CSIDevice_GBA()
 {
   --s_num_connected;
   RemoveEvent(m_device_number);
+}
+
+void CSIDevice_GBA::ResetCore()
+{
+  m_core = std::make_unique<HW::GBA::Core>(m_device_number, CoreTiming::GetTicks());
+  m_next_action = NextAction::SendCommand;
 }
 
 int CSIDevice_GBA::RunBuffer(u8* buffer, int request_length)
@@ -79,7 +84,7 @@ int CSIDevice_GBA::RunBuffer(u8* buffer, int request_length)
 #endif
     m_last_cmd = buffer[0];
     m_timestamp_sent = CoreTiming::GetTicks();
-    m_core.SendJoybusCommand(m_timestamp_sent, buffer);
+    m_core->SendJoybusCommand(m_timestamp_sent, buffer);
 
     m_next_action = NextAction::WaitTransferTime;
     [[fallthrough]];
@@ -97,7 +102,7 @@ int CSIDevice_GBA::RunBuffer(u8* buffer, int request_length)
 
   case NextAction::ReceiveResponse:
   {
-    std::vector<u8> response = m_core.GetJoybusResponse();
+    std::vector<u8> response = m_core->GetJoybusResponse();
     m_next_action = NextAction::SendCommand;
 
     if (response.empty())
@@ -149,12 +154,12 @@ void CSIDevice_GBA::DoState(PointerWrap& p)
   p.Do(m_next_action);
   p.Do(m_last_cmd);
   p.Do(m_timestamp_sent);
-  m_core.DoState(p);
+  m_core->DoState(p);
 }
 
 void CSIDevice_GBA::OnEvent(s64 cycles_late)
 {
-  m_core.SendJoybusCommand(CoreTiming::GetTicks(), nullptr, true);
+  m_core->SendJoybusCommand(CoreTiming::GetTicks(), nullptr);
   ScheduleEvent(m_device_number, GetSyncInterval());
 }
 

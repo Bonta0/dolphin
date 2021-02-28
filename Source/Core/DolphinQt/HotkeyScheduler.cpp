@@ -8,6 +8,7 @@
 #include <cmath>
 #include <thread>
 
+#include <QApplication>
 #include <QCoreApplication>
 
 #include "AudioCommon/AudioCommon.h"
@@ -27,6 +28,7 @@
 #include "Core/IOS/USB/Bluetooth/BTBase.h"
 #include "Core/State.h"
 
+#include "DolphinQt/GBAWidget.h"
 #include "DolphinQt/Settings.h"
 
 #include "InputCommon/ControlReference/ControlReference.h"
@@ -521,18 +523,7 @@ void HotkeyScheduler::Run()
         }
       }
 
-      if (IsHotkey(HK_GBA_LOAD))
-        emit GBALoad();
-      if (IsHotkey(HK_GBA_UNLOAD))
-        emit GBAUnload();
-      if (IsHotkey(HK_GBA_RESET))
-        emit GBAReset();
-      if (IsHotkey(HK_GBA_VOLUME_DOWN))
-        emit GBAVolumeDown();
-      if (IsHotkey(HK_GBA_VOLUME_UP))
-        emit GBAVolumeUp();
-      if (IsHotkey(HK_GBA_TOGGLE_MUTE))
-        emit GBAToggleMute();
+      CheckGBAHotkeys();
     }
 
     const auto stereo_depth = Config::Get(Config::GFX_STEREO_DEPTH);
@@ -621,4 +612,41 @@ void HotkeyScheduler::CheckDebuggingHotkeys()
 
   if (IsHotkey(HK_BP_ADD))
     emit AddBreakpoint();
+}
+
+void HotkeyScheduler::CheckGBAHotkeys()
+{
+  GBAWidget* gba_widget = qobject_cast<GBAWidget*>(QApplication::activeWindow());
+  if (!gba_widget)
+    return;
+
+  if (IsHotkey(HK_GBA_LOAD))
+    QMetaObject::invokeMethod(gba_widget, &GBAWidget::LoadROM);
+
+  if (IsHotkey(HK_GBA_UNLOAD))
+    QMetaObject::invokeMethod(gba_widget, &GBAWidget::UnloadROM);
+
+  if (IsHotkey(HK_GBA_RESET))
+    QMetaObject::invokeMethod(gba_widget, &GBAWidget::ResetCore);
+
+  if (IsHotkey(HK_GBA_VOLUME_DOWN))
+    QMetaObject::invokeMethod(gba_widget, &GBAWidget::VolumeDown);
+
+  if (IsHotkey(HK_GBA_VOLUME_UP))
+    QMetaObject::invokeMethod(gba_widget, &GBAWidget::VolumeUp);
+
+  if (IsHotkey(HK_GBA_TOGGLE_MUTE))
+    QMetaObject::invokeMethod(gba_widget, &GBAWidget::ToggleMute);
+
+  if (IsHotkey(HK_GBA_1X))
+    QMetaObject::invokeMethod(gba_widget, [=] { gba_widget->Resize(1); });
+
+  if (IsHotkey(HK_GBA_2X))
+    QMetaObject::invokeMethod(gba_widget, [=] { gba_widget->Resize(2); });
+
+  if (IsHotkey(HK_GBA_3X))
+    QMetaObject::invokeMethod(gba_widget, [=] { gba_widget->Resize(3); });
+
+  if (IsHotkey(HK_GBA_4X))
+    QMetaObject::invokeMethod(gba_widget, [=] { gba_widget->Resize(4); });
 }
