@@ -17,35 +17,44 @@
 
 namespace SerialInterface
 {
-namespace
-{
-int s_num_connected = 0;
-} // namespace
-
 // --- GameBoy Advance "Link Cable" ---
 
 static int GetTransferTime(u8 cmd)
 {
-  u64 bytes_transferred = 0;
+  u64 gc_bits_transferred = 8;
+  u64 gba_bits_transferred = 0;
 
   switch (cmd)
   {
   case GBASIOJOYCommand::JOY_RESET:
   case GBASIOJOYCommand::JOY_POLL:
-    bytes_transferred = 4;
-    break;
-  case GBASIOJOYCommand::JOY_TRANS:
-    bytes_transferred = 6;
-    break;
-  case GBASIOJOYCommand::JOY_RECV:
-    bytes_transferred = 1;
-    break;
-  default:
-    bytes_transferred = 1;
+  {
+    gba_bits_transferred = 24;
     break;
   }
-  return static_cast<int>(bytes_transferred * SystemTimers::GetTicksPerSecond() /
-                          (std::max(s_num_connected, 1) * HW::GBA::BYTES_PER_SECOND));
+  case GBASIOJOYCommand::JOY_TRANS:
+  {
+    gba_bits_transferred = 40;
+    break;
+  }
+  case GBASIOJOYCommand::JOY_RECV:
+  {
+    gc_bits_transferred += 32;
+    gba_bits_transferred += 8;
+    break;
+  }
+  default:
+  {
+    break;
+  }
+  }
+
+  u64 cycles =
+      (gba_bits_transferred * SystemTimers::GetTicksPerSecond() / HW::GBA::GBA_BITS_PER_SECOND) +
+      (gc_bits_transferred * SystemTimers::GetTicksPerSecond() / HW::GBA::GC_BITS_PER_SECOND) +
+      ((HW::GBA::GC_STOP_BIT_NS + HW::GBA::GBA_STOP_BIT_NS) * SystemTimers::GetTicksPerSecond() /
+       1000000000LL);
+  return static_cast<int>(cycles);
 }
 
 static s64 GetSyncInterval()
@@ -56,12 +65,10 @@ static s64 GetSyncInterval()
 CSIDevice_GBA::CSIDevice_GBA(SIDevices device, int device_number) : ISIDevice(device, device_number)
 {
   ResetCore();
-  ++s_num_connected;
 }
 
 CSIDevice_GBA::~CSIDevice_GBA()
 {
-  --s_num_connected;
   RemoveEvent(m_device_number);
 }
 

@@ -23,8 +23,10 @@
 
 namespace HW::GBA
 {
-static constexpr auto BITS_PER_SECOND = 115200;
-static constexpr auto BYTES_PER_SECOND = BITS_PER_SECOND / 8;
+constexpr auto GC_BITS_PER_SECOND = 200000;
+constexpr auto GBA_BITS_PER_SECOND = 250000;
+constexpr auto GC_STOP_BIT_NS = 6500;
+constexpr auto GBA_STOP_BIT_NS = 14000;
 
 class FrontendInterface;
 
