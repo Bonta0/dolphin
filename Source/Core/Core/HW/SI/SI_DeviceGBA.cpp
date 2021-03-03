@@ -107,10 +107,8 @@ int CSIDevice_GBA::RunBuffer(u8* buffer, int request_length)
 
     if (response.empty())
     {
-      u32 reply = Common::swap32(SI_ERROR_NO_RESPONSE);
-      std::memcpy(buffer, &reply, sizeof(reply));
       ScheduleEvent(m_device_number, GetSyncInterval());
-      return sizeof(reply);
+      return -1;
     }
     std::copy(response.begin(), response.end(), buffer);
 
