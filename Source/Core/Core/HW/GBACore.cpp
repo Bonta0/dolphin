@@ -380,7 +380,7 @@ void Core::RunCommand(Command& command)
           &m_sio_driver, static_cast<GBASIOJOYCommand>(command.buffer[0]), &command.buffer[1]);
       std::copy(command.buffer.begin() + 1, command.buffer.begin() + 1 + recvd,
                 std::back_inserter(m_response));
-      run_ahead = m_response.size() * 8 * SystemTimers::GetTicksPerSecond() / GBA_BITS_PER_SECOND;
+      run_ahead = m_response.size() * SystemTimers::GetTicksPerSecond() / BYTES_PER_SECOND;
     }
     if (m_thread && !m_response_ready)
     {
