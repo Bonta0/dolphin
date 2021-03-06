@@ -220,12 +220,12 @@ void Initialize()
 
   FreeLook::GetConfig().Refresh();
 
-  s_config.LoadConfig(true);
+  s_config.LoadConfig(InputConfig::InputType::GC);
 }
 
 void LoadInputConfig()
 {
-  s_config.LoadConfig(true);
+  s_config.LoadConfig(InputConfig::InputType::GC);
 }
 
 bool IsInitialized()
