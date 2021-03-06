@@ -210,6 +210,7 @@ union USIEXIClockCount
 
 static CoreTiming::EventType* s_change_device_event;
 static CoreTiming::EventType* s_tranfer_pending_event;
+static std::array<CoreTiming::EventType*, MAX_SI_CHANNELS> s_device_events;
 
 // User-configured device type. possibly overridden by TAS/Netplay
 static std::array<std::atomic<SIDevices>, MAX_SI_CHANNELS> s_desired_device_types;
@@ -368,8 +369,35 @@ void DoState(PointerWrap& p)
   p.Do(s_si_buffer);
 }
 
+static void DeviceEventCallback(u64 userdata, s64 cyclesLate)
+{
+  s_channel[userdata].device->OnEvent(cyclesLate);
+}
+
+static void RegisterEvents()
+{
+  s_change_device_event = CoreTiming::RegisterEvent("ChangeSIDevice", ChangeDeviceCallback);
+  s_tranfer_pending_event = CoreTiming::RegisterEvent("SITransferPending", RunSIBuffer);
+
+  for (int i = 0; i < MAX_SI_CHANNELS; ++i)
+    s_device_events[i] =
+        CoreTiming::RegisterEvent(fmt::format("SIEventChannel{}", i), DeviceEventCallback);
+}
+
+void ScheduleEvent(int device_number, s64 cycles_into_future)
+{
+  CoreTiming::ScheduleEvent(cycles_into_future, s_device_events[device_number], device_number);
+}
+
+void RemoveEvent(int device_number)
+{
+  CoreTiming::RemoveEvent(s_device_events[device_number]);
+}
+
 void Init()
 {
+  RegisterEvents();
+
   for (int i = 0; i < MAX_SI_CHANNELS; i++)
   {
     s_channel[i].out.hex = 0;
@@ -414,9 +442,6 @@ void Init()
   // s_exi_clock_count.LOCK = 1;
 
   s_si_buffer = {};
-
-  s_change_device_event = CoreTiming::RegisterEvent("ChangeSIDevice", ChangeDeviceCallback);
-  s_tranfer_pending_event = CoreTiming::RegisterEvent("SITransferPending", RunSIBuffer);
 }
 
 void Shutdown()
