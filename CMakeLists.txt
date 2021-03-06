@@ -532,6 +532,7 @@ if (_M_X86)
   add_subdirectory(Externals/Bochs_disasm)
 endif()
 add_subdirectory(Externals/cpp-optparse)
+add_subdirectory(Externals/mGBA)
 
 find_package(fmt 7.1)
 if(fmt_FOUND)

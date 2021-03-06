@@ -571,6 +571,7 @@ PUBLIC
 PRIVATE
   fmt::fmt
   ${LZO}
+  mgba
   ZLIB::ZLIB
 )
 
