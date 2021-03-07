@@ -40,6 +40,8 @@
 #include "Core/ConfigManager.h"
 #include "Core/GeckoCode.h"
 #include "Core/HW/EXI/EXI_DeviceIPL.h"
+#include "Core/HW/GBAPad.h"
+#include "Core/HW/GCPad.h"
 #include "Core/HW/SI/SI.h"
 #include "Core/HW/SI/SI_Device.h"
 #include "Core/HW/SI/SI_DeviceGCController.h"
@@ -452,6 +454,19 @@ unsigned int NetPlayClient::OnData(sf::Packet& packet)
   case NP_MSG_PAD_MAPPING:
   {
     for (PlayerId& mapping : m_pad_map)
+    {
+      packet >> mapping;
+    }
+
+    UpdateDevices();
+
+    m_dialog->Update();
+  }
+  break;
+
+  case NP_MSG_GBA_ENABLED:
+  {
+    for (bool& mapping : m_gba_enabled)
     {
       packet >> mapping;
     }
@@ -1380,24 +1395,24 @@ void NetPlayClient::GetPlayerList(std::string& list, std::vector<int>& pid_list)
 
   std::ostringstream ss;
 
-  const auto enumerate_player_controller_mappings = [&ss](const PadMappingArray& mappings,
-                                                          const Player& player) {
-    for (size_t i = 0; i < mappings.size(); i++)
-    {
-      if (mappings[i] == player.pid)
-        ss << i + 1;
-      else
-        ss << '-';
-    }
-  };
+  const auto enumerate_player_controller_mappings =
+      [&ss, this](const PadMappingArray& mappings, const Player& player, bool check_gba) {
+        for (size_t i = 0; i < mappings.size(); i++)
+        {
+          if (mappings[i] == player.pid)
+            ss << (check_gba && m_gba_enabled[i]) ? "G" : std::to_string(i + 1);
+          else
+            ss << '-';
+        }
+      };
 
   for (const auto& entry : m_players)
   {
     const Player& player = entry.second;
     ss << player.name << "[" << static_cast<int>(player.pid) << "] : " << player.revision << " | ";
 
-    enumerate_player_controller_mappings(m_pad_map, player);
-    enumerate_player_controller_mappings(m_wiimote_map, player);
+    enumerate_player_controller_mappings(m_pad_map, player, true);
+    enumerate_player_controller_mappings(m_wiimote_map, player, false);
 
     ss << " |\nPing: " << player.ping << "ms\n";
     ss << "Status: ";
@@ -1703,11 +1718,13 @@ void NetPlayClient::UpdateDevices()
 
   for (auto player_id : m_pad_map)
   {
-    // Use local controller types for local controllers if they are compatible
-    // Only GCController-like controllers are supported, GBA and similar
-    // exotic devices are not supported on netplay.
-    if (player_id == m_local_player->pid)
+    if (m_gba_enabled[pad] && player_id > 0)
     {
+      SerialInterface::ChangeDevice(SerialInterface::SIDEVICE_GC_GBA, pad);
+    }
+    else if (player_id == m_local_player->pid)
+    {
+      // Use local controller types for local controllers if they are compatible
       if (SerialInterface::SIDevice_IsGCController(SConfig::GetInstance().m_SIDevice[local_pad]))
       {
         SerialInterface::ChangeDevice(SConfig::GetInstance().m_SIDevice[local_pad], pad);
@@ -2029,6 +2046,9 @@ bool NetPlayClient::PollLocalPad(const int local_pad, sf::Packet& packet)
   {
   case SerialInterface::SIDEVICE_WIIU_ADAPTER:
     pad_status = GCAdapter::Input(local_pad);
+    break;
+  case SerialInterface::SIDEVICE_GC_GBA:
+    pad_status = Pad::GetGBAStatus(local_pad);
     break;
   case SerialInterface::SIDEVICE_GC_CONTROLLER:
   default:
@@ -2362,6 +2382,11 @@ void NetPlayClient::ComputeMD5(const SyncIdentifier& sync_identifier)
 const PadMappingArray& NetPlayClient::GetPadMapping() const
 {
   return m_pad_map;
+}
+
+const GBAEnabledArray& NetPlayClient::GetEnabledGBAs() const
+{
+  return m_gba_enabled;
 }
 
 const PadMappingArray& NetPlayClient::GetWiimoteMapping() const
