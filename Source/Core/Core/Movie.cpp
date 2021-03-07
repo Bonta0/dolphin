@@ -82,7 +82,7 @@ static bool s_bReadOnly = true;
 static u32 s_rerecords = 0;
 static PlayMode s_playMode = MODE_NONE;
 
-static u8 s_controllers = 0;
+static u16 s_controllers = 0;
 static ControllerState s_padState;
 static DTMHeader tmpHeader;
 static std::vector<u8> s_temp_input;
@@ -394,6 +394,11 @@ bool IsUsingBongo(int controller)
   return ((s_bongos & (1 << controller)) != 0);
 }
 
+bool IsUsingGBA(int controller)
+{
+  return ((s_controllers & (1 << (controller + 8))) != 0);
+}
+
 bool IsUsingWiimote(int wiimote)
 {
   return ((s_controllers & (1 << (wiimote + 4))) != 0);
@@ -431,15 +436,21 @@ void ChangePads()
   {
     if (SerialInterface::SIDevice_IsGCController(SConfig::GetInstance().m_SIDevice[i]))
       controllers |= (1 << i);
+    if (SConfig::GetInstance().m_SIDevice[i] == SerialInterface::SIDEVICE_GC_GBA)
+      controllers |= (1 << (i + 8));
   }
 
-  if ((s_controllers & 0x0F) == controllers)
+  if ((s_controllers & 0x0F0F) == controllers)
     return;
 
   for (int i = 0; i < SerialInterface::MAX_SI_CHANNELS; ++i)
   {
     SerialInterface::SIDevices device = SerialInterface::SIDEVICE_NONE;
-    if (IsUsingPad(i))
+    if (IsUsingGBA(i))
+    {
+      device = SerialInterface::SIDEVICE_GC_GBA;
+    }
+    else if (IsUsingPad(i))
     {
       if (SerialInterface::SIDevice_IsGCController(SConfig::GetInstance().m_SIDevice[i]))
       {
@@ -463,10 +474,10 @@ void ChangeWiiPads(bool instantly)
 
   for (int i = 0; i < MAX_WIIMOTES; ++i)
     if (WiimoteCommon::GetSource(i) != WiimoteSource::None)
-      controllers |= (1 << i);
+      controllers |= (1 << (i + 4));
 
   // This is important for Wiimotes, because they can desync easily if they get re-activated
-  if (instantly && (s_controllers >> 4) == controllers)
+  if (instantly && (s_controllers & 0xF0) == controllers)
     return;
 
   const auto ios = IOS::HLE::GetIOS();
@@ -810,7 +821,7 @@ void CheckPadStatus(const GCPadStatus* PadStatus, int controllerID)
 // NOTE: CPU Thread
 void RecordInput(const GCPadStatus* PadStatus, int controllerID)
 {
-  if (!IsRecordingInput() || !IsUsingPad(controllerID))
+  if (!IsRecordingInput() || (!IsUsingPad(controllerID) && !IsUsingGBA(controllerID)))
     return;
 
   CheckPadStatus(PadStatus, controllerID);
@@ -1117,7 +1128,8 @@ void PlayController(GCPadStatus* PadStatus, int controllerID)
 {
   // Correct playback is entirely dependent on the emulator polling the controllers
   // in the same order done during recording
-  if (!IsPlayingInput() || !IsUsingPad(controllerID) || s_temp_input.empty())
+  if (!IsPlayingInput() || (!IsUsingPad(controllerID) && !IsUsingGBA(controllerID)) ||
+      s_temp_input.empty())
     return;
 
   if (s_currentByte + sizeof(ControllerState) > s_temp_input.size())
@@ -1299,7 +1311,7 @@ void SaveRecording(const std::string& filename)
   strncpy(header.gameID.data(), SConfig::GetInstance().GetGameID().c_str(), 6);
   header.bWii = SConfig::GetInstance().bWii;
   header.bFollowBranch = SConfig::GetInstance().bJITFollowBranch;
-  header.controllers = s_controllers & (SConfig::GetInstance().bWii ? 0xFF : 0x0F);
+  header.controllers = s_controllers & (SConfig::GetInstance().bWii ? 0xFFFF : 0xFF0F);
 
   header.bFromSaveState = s_bRecordingFromSaveState;
   header.frameCount = s_totalFrames;

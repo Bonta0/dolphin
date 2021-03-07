@@ -410,7 +410,9 @@ void Init()
     {
       s_desired_device_types[i] = SIDEVICE_NONE;
 
-      if (Movie::IsUsingPad(i))
+      if (Movie::IsUsingGBA(i))
+        s_desired_device_types[i] = SIDEVICE_GC_GBA;
+      else if (Movie::IsUsingPad(i))
       {
         SIDevices current = SConfig::GetInstance().m_SIDevice[i];
         // GC pad-compatible devices can be used for both playing and recording

@@ -75,8 +75,8 @@ struct DTMHeader
   std::array<char, 6> gameID;  // The Game ID
   bool bWii;                   // Wii game
 
-  u8 controllers;  // Controllers plugged in (from least to most significant,
-                   // the bits are GC controllers 1-4 and Wiimotes 1-4)
+  u16 controllers;  // Controllers plugged in (from least to most significant,
+                    // the bits are GC controllers 1-4, Wiimotes 1-4 and GBAs 1-4)
 
   bool
       bFromSaveState;  // false indicates that the recording started from bootup, true for savestate
@@ -114,7 +114,6 @@ struct DTMHeader
   bool bNetPlay;
   bool bPAL60;
   u8 language;
-  u8 reserved3;
   bool bFollowBranch;
   std::array<u8, 9> reserved;       // Padding for any new config options
   std::array<char, 40> discChange;  // Name of iso file to switch to, for two disc games.
@@ -163,6 +162,7 @@ bool IsNetPlayRecording();
 bool IsUsingPad(int controller);
 bool IsUsingWiimote(int wiimote);
 bool IsUsingBongo(int controller);
+bool IsUsingGBA(int controller);
 void ChangePads();
 void ChangeWiiPads(bool instantly = false);
 
