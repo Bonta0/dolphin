@@ -107,7 +107,7 @@ void GamecubeControllersWidget::OnGCTypeChanged(int type)
     if (m_gc_controller_boxes[i] == box)
     {
       const int index = box->currentIndex();
-      m_gc_buttons[i]->setEnabled(index != 0 && index != 6);
+      m_gc_buttons[i]->setEnabled(index != 0);
       return;
     }
   }
@@ -128,9 +128,6 @@ void GamecubeControllersWidget::OnGCPadConfigure()
 
   switch (m_gc_controller_boxes[index]->currentIndex())
   {
-  case 0:  // None
-  case 6:  // GBA
-    return;
   case 1:  // Standard Controller
     type = MappingWindow::Type::MAPPING_GCPAD;
     break;
@@ -146,9 +143,13 @@ void GamecubeControllersWidget::OnGCPadConfigure()
   case 5:  // DK Bongos
     type = MappingWindow::Type::MAPPING_GC_BONGOS;
     break;
+  case 6:  // GBA
+    type = MappingWindow::Type::MAPPING_GC_GBA;
+    break;
   case 7:  // Keyboard
     type = MappingWindow::Type::MAPPING_GC_KEYBOARD;
     break;
+  case 0:  // None
   default:
     return;
   }
@@ -167,7 +168,7 @@ void GamecubeControllersWidget::LoadSettings()
     if (gc_index)
     {
       m_gc_controller_boxes[i]->setCurrentIndex(*gc_index);
-      m_gc_buttons[i]->setEnabled(*gc_index != 0 && *gc_index != 6);
+      m_gc_buttons[i]->setEnabled(*gc_index != 0);
     }
   }
 }
@@ -186,7 +187,7 @@ void GamecubeControllersWidget::SaveSettings()
         SerialInterface::ChangeDevice(*si_device, static_cast<s32>(i));
     }
 
-    m_gc_buttons[i]->setEnabled(index != 0 && index != 6);
+    m_gc_buttons[i]->setEnabled(index != 0);
   }
 
   if (GCAdapter::UseAdapter())
