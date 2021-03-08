@@ -47,6 +47,7 @@ private:
 
   std::vector<u32> m_video_buffer;
   int m_device_number;
+  int m_geometry_slot;
   std::string m_current_rom;
   std::string m_netplayer_name;
   std::string m_game_title;

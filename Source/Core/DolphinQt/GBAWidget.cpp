@@ -31,40 +31,51 @@
 
 GBAWidget::GBAWidget(int device_number, std::string_view current_rom, std::string_view title,
                      u32 width, u32 height, QWidget* parent, Qt::WindowFlags flags)
-    : QWidget(parent, flags), m_device_number(device_number), m_current_rom(current_rom),
-      m_game_title(title), m_width(width), m_height(height), m_volume(0), m_muted(false)
+    : QWidget(parent, flags), m_device_number(device_number), m_geometry_slot(device_number),
+      m_current_rom(current_rom), m_game_title(title), m_width(width), m_height(height),
+      m_volume(0), m_muted(false)
 {
-  setWindowIcon(Resources::GetAppIcon());
-  resize(width, height);
-  show();
-
-  QSettings& settings = Settings::GetQSettings();
-  auto key = QString::fromStdString(fmt::format("gbawidget/geometry{}", m_device_number + 1));
-  if (settings.contains(key))
-    restoreGeometry(settings.value(key).toByteArray());
-  else
-    move(static_cast<int>(x() - frameGeometry().width() / (device_number & 1 ? -2.f : 2.f)),
-         static_cast<int>(y() - frameGeometry().height() / (device_number & 2 ? -2.f : 2.f)));
+  bool visible = true;
 
   SetVolume(100);
 
   if (NetPlay::IsNetPlayRunning())
   {
     auto client = Settings::Instance().GetNetPlayClient();
-    auto pid = client->GetPadMapping()[device_number];
-    for (const auto& player : client->GetPlayers())
+    auto pid = client->GetPadMapping()[m_device_number];
+    for (const NetPlay::Player* player : client->GetPlayers())
     {
       if (player->pid == pid)
         m_netplayer_name = player->name;
     }
-    if (!client->IsLocalPlayer(pid))
+
+    if (client->IsLocalPlayer(pid))
     {
+      m_geometry_slot = client->InGamePadToLocalPad(m_device_number);
+    }
+    else
+    {
+      int ingame_slot = client->LocalPadToInGamePad(m_device_number);
+      if (ingame_slot < 4)
+        m_geometry_slot = ingame_slot;
       if (client->GetNetSettings().m_HideRemoteGBAs)
-        hide();
+        visible = false;
       if (!IsMuted())
         ToggleMute();
     }
   }
+
+  setWindowIcon(Resources::GetAppIcon());
+  resize(width, height);
+  setVisible(visible);
+
+  QSettings& settings = Settings::GetQSettings();
+  auto key = QString::fromStdString(fmt::format("gbawidget/geometry{}", m_geometry_slot + 1));
+  if (settings.contains(key))
+    restoreGeometry(settings.value(key).toByteArray());
+  else
+    move(static_cast<int>(x() - frameGeometry().width() / (m_geometry_slot & 1 ? -2.f : 2.f)),
+         static_cast<int>(y() - frameGeometry().height() / (m_geometry_slot & 2 ? -2.f : 2.f)));
 
   UpdateTitle();
 }
@@ -72,7 +83,7 @@ GBAWidget::GBAWidget(int device_number, std::string_view current_rom, std::strin
 GBAWidget::~GBAWidget()
 {
   QSettings& settings = Settings::GetQSettings();
-  auto key = QString::fromStdString(fmt::format("gbawidget/geometry{}", m_device_number + 1));
+  auto key = QString::fromStdString(fmt::format("gbawidget/geometry{}", m_geometry_slot + 1));
   settings.setValue(key, saveGeometry());
 }
 
