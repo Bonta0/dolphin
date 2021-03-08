@@ -738,6 +738,7 @@ unsigned int NetPlayClient::OnData(sf::Packet& packet)
         packet >> extension;
 
       packet >> m_net_settings.m_GolfMode;
+      packet >> m_net_settings.m_HideRemoteGBAs;
 
       m_net_settings.m_IsHosting = m_local_player->IsHost();
       m_net_settings.m_HostInputAuthority = m_host_input_authority;

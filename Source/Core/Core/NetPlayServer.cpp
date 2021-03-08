@@ -1401,6 +1401,7 @@ bool NetPlayServer::StartGame()
   }
 
   spac << m_settings.m_GolfMode;
+  spac << m_settings.m_HideRemoteGBAs;
 
   SendAsyncToClients(std::move(spac));
 

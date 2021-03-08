@@ -57,8 +57,13 @@ GBAWidget::GBAWidget(int device_number, std::string_view current_rom, std::strin
       if (player->pid == pid)
         m_netplayer_name = player->name;
     }
-    if (!client->IsLocalPlayer(pid) && !IsMuted())
-      ToggleMute();
+    if (!client->IsLocalPlayer(pid))
+    {
+      if (client->GetNetSettings().m_HideRemoteGBAs)
+        hide();
+      if (!IsMuted())
+        ToggleMute();
+    }
   }
 
   UpdateTitle();

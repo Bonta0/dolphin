@@ -174,6 +174,8 @@ void NetPlayDialog::CreateMainLayout()
   m_record_input_action->setCheckable(true);
   m_golf_mode_overlay_action = m_other_menu->addAction(tr("Show Golf Mode Overlay"));
   m_golf_mode_overlay_action->setCheckable(true);
+  m_hide_remote_gbas_action = m_other_menu->addAction(tr("Hide Remote GBAs"));
+  m_hide_remote_gbas_action->setCheckable(true);
 
   m_game_button->setDefault(false);
   m_game_button->setAutoDefault(false);
@@ -369,6 +371,7 @@ void NetPlayDialog::ConnectWidgets()
   connect(m_golf_mode_action, &QAction::toggled, this, &NetPlayDialog::SaveSettings);
   connect(m_golf_mode_overlay_action, &QAction::toggled, this, &NetPlayDialog::SaveSettings);
   connect(m_fixed_delay_action, &QAction::toggled, this, &NetPlayDialog::SaveSettings);
+  connect(m_hide_remote_gbas_action, &QAction::toggled, this, &NetPlayDialog::SaveSettings);
 }
 
 void NetPlayDialog::SendMessage(const std::string& msg)
@@ -511,6 +514,7 @@ void NetPlayDialog::OnStart()
   settings.m_SyncAllWiiSaves =
       m_sync_all_wii_saves_action->isChecked() && m_sync_save_data_action->isChecked();
   settings.m_GolfMode = m_golf_mode_action->isChecked();
+  settings.m_HideRemoteGBAs = m_hide_remote_gbas_action->isChecked();
 
   // Unload GameINI to restore things to normal
   Config::RemoveLayer(Config::LayerType::GlobalGame);
@@ -559,6 +563,7 @@ void NetPlayDialog::show(std::string nickname, bool use_traversal)
   m_data_menu->menuAction()->setVisible(is_hosting);
   m_network_menu->menuAction()->setVisible(is_hosting);
   m_md5_menu->menuAction()->setVisible(is_hosting);
+  m_hide_remote_gbas_action->setVisible(is_hosting);
   m_start_button->setHidden(!is_hosting);
   m_kick_button->setHidden(!is_hosting);
   m_assign_ports_button->setHidden(!is_hosting);
@@ -1076,6 +1081,7 @@ void NetPlayDialog::LoadSettings()
   const bool strict_settings_sync = Config::Get(Config::NETPLAY_STRICT_SETTINGS_SYNC);
   const bool sync_all_wii_saves = Config::Get(Config::NETPLAY_SYNC_ALL_WII_SAVES);
   const bool golf_mode_overlay = Config::Get(Config::NETPLAY_GOLF_MODE_OVERLAY);
+  const bool hide_remote_gbas = Config::Get(Config::NETPLAY_HIDE_REMOTE_GBAS);
 
   m_buffer_size_box->setValue(buffer_size);
   m_save_sd_action->setChecked(write_save_sdcard_data);
@@ -1086,6 +1092,7 @@ void NetPlayDialog::LoadSettings()
   m_strict_settings_sync_action->setChecked(strict_settings_sync);
   m_sync_all_wii_saves_action->setChecked(sync_all_wii_saves);
   m_golf_mode_overlay_action->setChecked(golf_mode_overlay);
+  m_hide_remote_gbas_action->setChecked(hide_remote_gbas);
 
   const std::string network_mode = Config::Get(Config::NETPLAY_NETWORK_MODE);
 
@@ -1125,6 +1132,7 @@ void NetPlayDialog::SaveSettings()
   Config::SetBase(Config::NETPLAY_STRICT_SETTINGS_SYNC, m_strict_settings_sync_action->isChecked());
   Config::SetBase(Config::NETPLAY_SYNC_ALL_WII_SAVES, m_sync_all_wii_saves_action->isChecked());
   Config::SetBase(Config::NETPLAY_GOLF_MODE_OVERLAY, m_golf_mode_overlay_action->isChecked());
+  Config::SetBase(Config::NETPLAY_HIDE_REMOTE_GBAS, m_hide_remote_gbas_action->isChecked());
 
   std::string network_mode;
   if (m_fixed_delay_action->isChecked())

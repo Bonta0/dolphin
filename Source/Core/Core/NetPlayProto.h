@@ -83,6 +83,7 @@ struct NetSettings
   bool m_SyncAllWiiSaves;
   std::array<int, 4> m_WiimoteExtension;
   bool m_GolfMode;
+  bool m_HideRemoteGBAs;
 
   // These aren't sent over the network directly
   bool m_IsHosting;

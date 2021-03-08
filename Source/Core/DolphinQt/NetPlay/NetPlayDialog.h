@@ -139,6 +139,7 @@ private:
   QAction* m_golf_mode_action;
   QAction* m_golf_mode_overlay_action;
   QAction* m_fixed_delay_action;
+  QAction* m_hide_remote_gbas_action;
   QPushButton* m_quit_button;
   QSplitter* m_splitter;
   QActionGroup* m_network_mode_group;
